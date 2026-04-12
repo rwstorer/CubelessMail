@@ -1,0 +1,29 @@
+{% extends 'mail/base.html' %}
+
+{% block title %}Message - CubelessMail{% endblock %}
+
+{% block sidebar %}
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Folders</div>
+    {% for folder in folders %}
+        <a href="{% url 'folder_inbox' folder_name=folder %}" class="sidebar-item {% if folder == current_folder %}active{% endif %}">
+            {{ folder }}
+        </a>
+    {% empty %}
+        <div class="sidebar-item">No folders found</div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="p-4">
+    <a href="{% if current_folder == 'INBOX' %}{% url 'inbox' %}{% else %}{% url 'folder_inbox' folder_name=current_folder %}{% endif %}" class="btn btn-secondary mb-4">&larr; Back to {{ current_folder }}</a>
+    <h2>{{ message.subject }}</h2>
+    <p class="text-small text-muted">From: {{ message.sender }}</p>
+    <p class="text-small text-muted">Date: {{ message.date }}</p>
+
+    <div class="message-body p-3" style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem; white-space: pre-wrap;">
+        {{ message.body|linebreaksbr }}
+    </div>
+</div>
+{% endblock %}

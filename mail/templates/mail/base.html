@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CubelessMail{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <div class="container header-title">
+                <h1>CubelessMail</h1>
+            </div>
+            <div class="header-controls">
+                <button type="button" id="themeToggle" class="btn btn-secondary btn-small" title="Toggle dark mode">
+                    🌙
+                </button>
+                <button type="button" id="sidebarToggle" class="btn btn-secondary btn-small">Hide folders</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <aside class="sidebar" id="folderSidebar">
+            {% block sidebar %}{% endblock %}
+            <div class="sidebar-resizer" id="sidebarResizer" aria-label="Resize folders column"></div>
+        </aside>
+
+        <article class="content">
+            {% block content %}{% endblock %}
+        </article>
+    </main>
+
+    <script src="{% static 'js/sidebar.js' %}"></script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+/* Theme Variables */
+:root {
+  /* Light theme (default) */
+  --bg-color: #f5f5f5;
+  --surface-color: #ffffff;
+  --text-color: #333333;
+  --text-muted: #666666;
+  --border-color: #dddddd;
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  --hover-bg: #f9f9f9;
+  --active-bg: #e8f4f8;
+  --active-border: #0066cc;
+  --btn-primary-bg: #0066cc;
+  --btn-primary-hover: #0052a3;
+  --btn-secondary-bg: #f0f0f0;
+  --btn-secondary-hover: #e8e8e8;
+  --btn-secondary-text: #333333;
+  --btn-secondary-border: #dddddd;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --bg-color: #1a1a1a;
+  --surface-color: #2d2d2d;
+  --text-color: #f0f0f0;
+  --text-muted: #cccccc;
+  --border-color: #404040;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --hover-bg: #3a3a3a;
+  --active-bg: #4a6b7a;
+  --active-border: #7ab8ff;
+  --btn-primary-bg: #4a9eff;
+  --btn-primary-hover: #3a8eff;
+  --btn-secondary-bg: #404040;
+  --btn-secondary-hover: #4a4a4a;
+  --btn-secondary-text: #f0f0f0;
+  --btn-secondary-border: #404040;
+}
+
+/* CubelessMail - Main Stylesheet */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  color: var(--text-color);
+  background-color: var(--bg-color);
+  line-height: 1.6;
+}
+
+/* Layout */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+header {
+  background: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 20px;
+}
+
+.header-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+main {
+  display: flex;
+  min-height: calc(100vh - 72px);
+  gap: 1rem;
+}
+
+/* Sidebar */
+.sidebar {
+  position: relative;
+  width: 250px;
+  min-width: 180px;
+  max-width: 420px;
+  background: var(--surface-color);
+  border-right: 1px solid var(--border-color);
+  padding: 1rem 0;
+  overflow-y: auto;
+}
+
+.sidebar.collapsed {
+  display: none;
+}
+
+.sidebar-section {
+  margin-bottom: 1rem;
+}
+
+.sidebar-section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.5rem 1rem;
+  text-transform: uppercase;
+}
+
+.sidebar-item {
+  display: block;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.2s ease;
+  color: var(--text-color);
+}
+
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: ew-resize;
+  background: transparent;
+}
+
+.btn-small {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+.sidebar-item:hover {
+  background: var(--hover-bg);
+}
+
+.sidebar-item.active {
+  background: var(--active-bg);
+  border-left-color: var(--active-border);
+  font-weight: 500;
+  color: #ffffff;
+}
+
+/* Content Area */
+.content {
+  flex: 1;
+  background: var(--surface-color);
+  overflow-y: auto;
+}
+
+/* Buttons */
+button, .btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--btn-primary-bg);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--btn-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: 1px solid var(--btn-secondary-border);
+}
+
+.btn-secondary:hover {
+  background: var(--btn-secondary-hover);
+}
+
+/* Forms */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+}
+
+/* Utility Classes */
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+
+.p-1 { padding: 0.25rem; }
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 1rem; }
+.p-4 { padding: 1.5rem; }
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+.text-muted { color: var(--text-muted); }
+.text-small { font-size: 0.875rem; }

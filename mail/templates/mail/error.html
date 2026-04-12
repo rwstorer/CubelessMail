@@ -1,0 +1,16 @@
+{% extends 'mail/base.html' %}
+
+{% block title %}Error - CubelessMail{% endblock %}
+
+{% block sidebar %}
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Error</div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="p-4">
+    <h2 style="color: #d32f2f;">Error</h2>
+    <p>{{ error }}</p>
+</div>
+{% endblock %}

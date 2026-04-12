@@ -1,0 +1,101 @@
+{% extends 'mail/base.html' %}
+
+{% block title %}{{ current_folder }} - CubelessMail{% endblock %}
+
+{% block sidebar %}
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Folders</div>
+    {% for folder in folders %}
+        <a href="{% url 'folder_inbox' folder_name=folder %}" class="sidebar-item {% if folder == current_folder %}active{% endif %}">
+            {{ folder }}
+        </a>
+    {% empty %}
+        <div class="sidebar-item">No folders found</div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="p-4">
+    <h2>{{ current_folder }}</h2>
+    <p class="text-small text-muted">{{ account.email }} • {{ messages|length }} messages</p>
+
+    <div class="message-list">
+        {% for message in messages %}
+            <a href="{% url 'message_detail' uid=message.uid %}?folder={{ current_folder|urlencode }}" class="message-item">
+                <div class="message-header">
+                    <div class="message-sender">
+                        <strong>{{ message.sender_name }}</strong>
+                        <span class="text-small text-muted">{{ message.sender }}</span>
+                    </div>
+                    <div class="message-date text-small text-muted">
+                        {{ message.date }}
+                    </div>
+                </div>
+                <div class="message-subject">
+                    {{ message.subject }}
+                </div>
+                <div class="message-preview text-small text-muted">
+                    {{ message.body|truncatewords:20 }}
+                </div>
+            </a>
+        {% empty %}
+            <p class="text-center text-muted p-4">No messages in {{ current_folder }}</p>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.message-list {
+    border-top: 1px solid var(--border-color);
+}
+
+.message-item {
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.message-item {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.message-item:hover {
+    background: var(--hover-bg);
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.message-sender {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.message-date {
+    white-space: nowrap;
+}
+
+.message-subject {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.message-preview {
+    max-width: 600px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+</style>
+{% endblock %}
