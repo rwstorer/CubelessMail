@@ -82,7 +82,7 @@ header {
 main {
   display: flex;
   min-height: calc(100vh - 72px);
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
 /* Sidebar */
