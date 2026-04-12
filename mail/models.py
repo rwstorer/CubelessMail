@@ -19,3 +19,47 @@ class EmailAccount(models.Model):
     
     def __str__(self):
         return self.email
+
+
+class Folder(models.Model):
+    """Caches folder information to avoid repeated IMAP LIST commands."""
+    
+    account = models.ForeignKey(EmailAccount, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    last_updated = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        unique_together = ['account', 'name']
+        verbose_name = 'Cached Folder'
+        verbose_name_plural = 'Cached Folders'
+    
+    def __str__(self):
+        return f"{self.account.email}: {self.name}"
+
+
+class CachedMessage(models.Model):
+    """Caches message headers/metadata for fast message list display."""
+    
+    account = models.ForeignKey(EmailAccount, on_delete=models.CASCADE)
+    folder = models.ForeignKey(Folder, on_delete=models.CASCADE)
+    uid = models.CharField(max_length=50)  # IMAP UID
+    subject = models.CharField(max_length=500, blank=True)
+    sender = models.CharField(max_length=255, blank=True)
+    sender_name = models.CharField(max_length=255, blank=True)
+    date = models.DateTimeField(null=True, blank=True)
+    size = models.IntegerField(default=0)
+    flags = models.JSONField(default=list)  # ['SEEN', 'FLAGGED', etc.]
+    last_updated = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['account', 'folder', 'uid']
+        verbose_name = 'Cached Message'
+        verbose_name_plural = 'Cached Messages'
+        indexes = [
+            models.Index(fields=['account', 'folder', 'last_updated']),
+            models.Index(fields=['account', 'folder', 'uid']),
+        ]
+    
+    def __str__(self):
+        return f"{self.folder.name}: {self.subject[:50]}"

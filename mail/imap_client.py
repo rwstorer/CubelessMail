@@ -221,6 +221,106 @@ class IMAPEmailClient:
 
         return body.strip()
 
+    def sync_folders_cache(self, account, FolderModel):
+        """
+        Sync folder cache with IMAP server.
+        
+        Args:
+            account: EmailAccount instance
+            FolderModel: Django Folder model class
+            
+        Returns:
+            List of folder names
+        """
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+
+        try:
+            server_folders = self.list_folders()
+            
+            # Mark all existing folders as inactive
+            FolderModel.objects.filter(account=account).update(is_active=False)
+            
+            # Add/update folders from server
+            for folder_name in server_folders:
+                FolderModel.objects.update_or_create(
+                    account=account,
+                    name=folder_name,
+                    defaults={'is_active': True}
+                )
+            
+            return server_folders
+        except Exception as e:
+            raise RuntimeError(f"Failed to sync folder cache: {str(e)}")
+
+    def sync_messages_cache(self, account, folder_obj, CachedMessageModel, limit=100):
+        """
+        Sync message headers cache for a folder.
+        
+        Args:
+            account: EmailAccount instance
+            folder_obj: Folder instance
+            CachedMessageModel: Django CachedMessage model class
+            limit: Maximum messages to cache (default 100)
+            
+        Returns:
+            Number of messages cached
+        """
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+
+        try:
+            # Select folder and get message IDs
+            self.client.select_folder(folder_obj.name)
+            msg_ids = self.client.search('ALL')
+            
+            if not msg_ids:
+                return 0
+            
+            # Limit to most recent messages
+            msg_ids = sorted(msg_ids, reverse=True)[:limit]
+            
+            # Fetch message headers
+            response = self.client.fetch(msg_ids, ['ENVELOPE', 'RFC822.SIZE', 'FLAGS'])
+            
+            cached_count = 0
+            for msg_id, msg_data in response.items():
+                try:
+                    envelope = msg_data.get(b'ENVELOPE')
+                    if envelope:
+                        # Extract message metadata
+                        subject = envelope.subject.decode('utf-8', errors='ignore') if envelope.subject else ''
+                        sender = str(envelope.from_[0]) if envelope.from_ else ''
+                        sender_name = self._extract_sender_name(sender)
+                        date = envelope.date
+                        size = msg_data.get(b'RFC822.SIZE', 0)
+                        flags = [flag.decode() if isinstance(flag, bytes) else str(flag) 
+                                for flag in msg_data.get(b'FLAGS', [])]
+                        
+                        # Cache the message
+                        CachedMessageModel.objects.update_or_create(
+                            account=account,
+                            folder=folder_obj,
+                            uid=str(msg_id),
+                            defaults={
+                                'subject': subject[:500],  # Truncate if too long
+                                'sender': sender,
+                                'sender_name': sender_name,
+                                'date': date,
+                                'size': size,
+                                'flags': flags,
+                            }
+                        )
+                        cached_count += 1
+                        
+                except Exception as e:
+                    # Skip problematic messages but continue
+                    continue
+            
+            return cached_count
+        except Exception as e:
+            raise RuntimeError(f"Failed to sync message cache: {str(e)}")
+
     def __enter__(self):
         """Context manager entry."""
         self.connect()

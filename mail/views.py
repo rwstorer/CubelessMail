@@ -1,6 +1,8 @@
 from django.http import Http404
 from django.shortcuts import render
-from .models import EmailAccount
+from django.utils import timezone
+from datetime import timedelta
+from .models import EmailAccount, Folder, CachedMessage
 from .imap_client import IMAPEmailClient
 
 
@@ -16,27 +18,116 @@ def inbox(request, folder_name='INBOX'):
         })
     
     current_folder = folder_name or 'INBOX'
-    folders = []
-    messages = []
     
+    # Try to get cached folders first (10 minute cache)
+    cache_cutoff = timezone.now() - timedelta(minutes=10)
+    cached_folders = Folder.objects.filter(
+        account=account,
+        last_updated__gte=cache_cutoff,
+        is_active=True
+    )
+    
+    if cached_folders.exists():
+        # Use cached folders
+        folders = list(cached_folders.values_list('name', flat=True))
+    else:
+        # Cache miss - fetch from server and update cache
+        try:
+            with IMAPEmailClient(
+                account.imap_host,
+                account.imap_username,
+                account.imap_password,
+                port=account.imap_port
+            ) as client:
+                folders = client.sync_folders_cache(account, Folder)
+        except Exception as e:
+            # Fallback to stale cache if server is down
+            folders = list(Folder.objects.filter(
+                account=account, 
+                is_active=True
+            ).values_list('name', flat=True))
+    
+    # Get current folder object
     try:
-        # Connect to IMAP and fetch data
-        with IMAPEmailClient(
-            account.imap_host,
-            account.imap_username,
-            account.imap_password,
-            port=account.imap_port
-        ) as client:
-            # Get folders
-            folders = client.list_folders()
-            
-            # Get folder messages (limit to 50 for simplicity)
-            messages = client.fetch_emails(current_folder, limit=50)
+        folder_obj = Folder.objects.get(account=account, name=current_folder, is_active=True)
+    except Folder.DoesNotExist:
+        # Folder not in cache, try to refresh cache
+        try:
+            with IMAPEmailClient(
+                account.imap_host,
+                account.imap_username,
+                account.imap_password,
+                port=account.imap_port
+            ) as client:
+                folders = client.sync_folders_cache(account, Folder)
+                folder_obj = Folder.objects.get(account=account, name=current_folder, is_active=True)
+        except (Folder.DoesNotExist, Exception):
+            raise Http404(f"Folder '{current_folder}' not found")
     
-    except Exception as e:
-        return render(request, 'mail/error.html', {
-            'error': f'Failed to connect to email account: {str(e)}'
-        })
+    # Try to get cached messages first (5 minute cache for message headers)
+    msg_cache_cutoff = timezone.now() - timedelta(minutes=5)
+    cached_messages = CachedMessage.objects.filter(
+        account=account,
+        folder=folder_obj,
+        last_updated__gte=msg_cache_cutoff
+    ).order_by('-date')[:50]  # Limit to 50 most recent
+    
+    if cached_messages.exists():
+        # Use cached message headers
+        messages = []
+        for cached_msg in cached_messages:
+            messages.append({
+                'uid': cached_msg.uid,
+                'subject': cached_msg.subject,
+                'sender': cached_msg.sender,
+                'sender_name': cached_msg.sender_name,
+                'date': cached_msg.date,
+                'flags': cached_msg.flags,
+                'size': cached_msg.size,
+            })
+    else:
+        # Cache miss - fetch from server and update cache
+        try:
+            with IMAPEmailClient(
+                account.imap_host,
+                account.imap_username,
+                account.imap_password,
+                port=account.imap_port
+            ) as client:
+                # Sync message cache
+                client.sync_messages_cache(account, folder_obj, CachedMessage, limit=50)
+                
+                # Now get the cached messages
+                cached_messages = CachedMessage.objects.filter(
+                    account=account,
+                    folder=folder_obj
+                ).order_by('-date')[:50]
+                
+                messages = []
+                for cached_msg in cached_messages:
+                    messages.append({
+                        'uid': cached_msg.uid,
+                        'subject': cached_msg.subject,
+                        'sender': cached_msg.sender,
+                        'sender_name': cached_msg.sender_name,
+                        'date': cached_msg.date,
+                        'flags': cached_msg.flags,
+                        'size': cached_msg.size,
+                    })
+        except Exception as e:
+            # Fallback to direct IMAP fetch if caching fails
+            try:
+                with IMAPEmailClient(
+                    account.imap_host,
+                    account.imap_username,
+                    account.imap_password,
+                    port=account.imap_port
+                ) as client:
+                    messages = client.fetch_emails(current_folder, limit=50)
+            except Exception as e:
+                return render(request, 'mail/error.html', {
+                    'error': f'Failed to fetch messages: {str(e)}'
+                })
     
     context = {
         'account': account,
@@ -58,9 +149,37 @@ def message_detail(request, uid):
         })
 
     selected_folder = request.GET.get('folder', 'INBOX')
-    folders = []
+    
+    # Try to get cached folders first (10 minute cache)
+    cache_cutoff = timezone.now() - timedelta(minutes=10)
+    cached_folders = Folder.objects.filter(
+        account=account,
+        last_updated__gte=cache_cutoff,
+        is_active=True
+    )
+    
+    if cached_folders.exists():
+        # Use cached folders
+        folders = list(cached_folders.values_list('name', flat=True))
+    else:
+        # Cache miss - fetch from server and update cache
+        try:
+            with IMAPEmailClient(
+                account.imap_host,
+                account.imap_username,
+                account.imap_password,
+                port=account.imap_port
+            ) as client:
+                folders = client.sync_folders_cache(account, Folder)
+        except Exception as e:
+            # Fallback to stale cache if server is down
+            folders = list(Folder.objects.filter(
+                account=account, 
+                is_active=True
+            ).values_list('name', flat=True))
+    
+    # Fetch full message (bodies are not cached, only headers)
     message = None
-
     try:
         with IMAPEmailClient(
             account.imap_host,
@@ -68,7 +187,6 @@ def message_detail(request, uid):
             account.imap_password,
             port=account.imap_port
         ) as client:
-            folders = client.list_folders()
             message = client.fetch_email_by_uid(uid, folder=selected_folder)
 
     except Exception as e:
