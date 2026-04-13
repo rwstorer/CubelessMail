@@ -49,6 +49,7 @@ class CachedMessage(models.Model):
     sender_name = models.CharField(max_length=255, blank=True)
     date = models.DateTimeField(null=True, blank=True)
     size = models.IntegerField(default=0)
+    has_attachments = models.BooleanField(default=False)
     flags = models.JSONField(default=list)  # ['SEEN', 'FLAGGED', etc.]
     last_updated = models.DateTimeField(auto_now=True)
     

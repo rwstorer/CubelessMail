@@ -35,6 +35,9 @@
                 </div>
                 <div class="message-subject">
                     {{ message.subject }}
+                    {% if message.has_attachments %}
+                        <span class="attachment-indicator" title="Has attachments" aria-label="Has attachments">&#128206;</span>
+                    {% endif %}
                 </div>
                 <div class="message-preview text-small text-muted">
                     {{ message.body|truncatewords:20 }}
@@ -90,6 +93,12 @@
     font-weight: 500;
     margin-bottom: 0.5rem;
     color: var(--text-color);
+}
+
+.attachment-indicator {
+    margin-left: 0.35rem;
+    color: var(--text-muted);
+    font-size: 0.95em;
 }
 
 .unread-badge {

@@ -85,6 +85,7 @@ def inbox(request, folder_name='INBOX'):
                 'date': cached_msg.date,
                 'flags': cached_msg.flags,
                 'size': cached_msg.size,
+                'has_attachments': cached_msg.has_attachments,
             })
     else:
         # Cache miss - fetch from server and update cache
@@ -114,6 +115,7 @@ def inbox(request, folder_name='INBOX'):
                         'date': cached_msg.date,
                         'flags': cached_msg.flags,
                         'size': cached_msg.size,
+                        'has_attachments': cached_msg.has_attachments,
                     })
         except Exception as e:
             # Fallback to direct IMAP fetch if caching fails

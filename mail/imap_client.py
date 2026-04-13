@@ -122,6 +122,7 @@ class IMAPEmailClient:
                         'sender_name': self._extract_sender_name(email_obj.get('from', '')),
                         'date': email_obj.get('date', ''),
                         'body': self._extract_body(email_obj),
+                        'has_attachments': bool(self._extract_attachments(email_obj)),
                         'raw': email_obj,
                     }
                     emails.append(email_dict)
@@ -448,6 +449,56 @@ class IMAPEmailClient:
 
         return attachments
 
+    def _has_attachments_from_bodystructure(self, bodystructure):
+        """Detect likely attachments from IMAP BODYSTRUCTURE metadata only."""
+        if not bodystructure:
+            return False
+
+        tokens = []
+
+        def _walk(node):
+            if node is None:
+                return
+
+            if isinstance(node, bytes):
+                token = node.decode('utf-8', errors='ignore').strip().upper()
+                if token:
+                    tokens.append(token)
+                return
+
+            if isinstance(node, str):
+                token = node.strip().upper()
+                if token:
+                    tokens.append(token)
+                return
+
+            if isinstance(node, (list, tuple)):
+                for child in node:
+                    _walk(child)
+                return
+
+            try:
+                for child in node:
+                    _walk(child)
+                return
+            except TypeError:
+                pass
+
+            token = str(node).strip().upper()
+            if token:
+                tokens.append(token)
+
+        _walk(bodystructure)
+
+        if 'ATTACHMENT' in tokens:
+            return True
+
+        # Common fallback: filename/name parameters indicate an attached part.
+        if 'FILENAME' in tokens or 'NAME' in tokens:
+            return True
+
+        return False
+
     def sync_folders_cache(self, account, FolderModel):
         """
         Sync folder cache with IMAP server.
@@ -507,8 +558,8 @@ class IMAPEmailClient:
             # Limit to most recent messages
             msg_ids = sorted(msg_ids, reverse=True)[:limit]
             
-            # Fetch message headers
-            response = self.client.fetch(msg_ids, ['ENVELOPE', 'RFC822.SIZE', 'FLAGS'])
+            # Fetch metadata only; no full message download required.
+            response = self.client.fetch(msg_ids, ['ENVELOPE', 'RFC822.SIZE', 'FLAGS', 'BODYSTRUCTURE'])
             
             cached_count = 0
             for msg_id, msg_data in response.items():
@@ -521,6 +572,8 @@ class IMAPEmailClient:
                         sender_name = self._extract_sender_name(sender)
                         date = envelope.date
                         size = msg_data.get(b'RFC822.SIZE', 0)
+                        bodystructure = msg_data.get(b'BODYSTRUCTURE')
+                        has_attachments = self._has_attachments_from_bodystructure(bodystructure)
                         flags = [flag.decode() if isinstance(flag, bytes) else str(flag) 
                                 for flag in msg_data.get(b'FLAGS', [])]
                         
@@ -535,6 +588,7 @@ class IMAPEmailClient:
                                 'sender_name': sender_name,
                                 'date': date,
                                 'size': size,
+                                'has_attachments': has_attachments,
                                 'flags': flags,
                             }
                         )
