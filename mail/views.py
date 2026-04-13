@@ -203,3 +203,44 @@ def message_detail(request, uid):
         'current_folder': selected_folder,
         'folders': folders,
     })
+
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+
+
+@require_GET
+def check_new_messages(request):
+    """AJAX endpoint to check for new messages in current folder."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return JsonResponse({'error': 'No account configured'}, status=400)
+    
+    folder_name = request.GET.get('folder', 'INBOX')
+    
+    try:
+        # Get current cached message count
+        folder_obj = Folder.objects.get(account=account, name=folder_name, is_active=True)
+        cached_count = CachedMessage.objects.filter(
+            account=account,
+            folder=folder_obj
+        ).count()
+        
+        # Quick IMAP check for actual count
+        with IMAPEmailClient(
+            account.imap_host,
+            account.imap_username,
+            account.imap_password,
+            port=account.imap_port
+        ) as client:
+            client.client.select_folder(folder_name)
+            actual_count = len(client.client.search('ALL'))
+        
+        return JsonResponse({
+            'cached_count': cached_count,
+            'actual_count': actual_count,
+            'has_new': actual_count > cached_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
