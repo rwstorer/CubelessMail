@@ -18,6 +18,7 @@ def inbox(request, folder_name='INBOX'):
         })
     
     current_folder = folder_name or 'INBOX'
+    force_refresh = request.GET.get('refresh') == '1'
     
     # Try to get cached folders first (10 minute cache)
     cache_cutoff = timezone.now() - timedelta(minutes=10)
@@ -72,7 +73,7 @@ def inbox(request, folder_name='INBOX'):
         last_updated__gte=msg_cache_cutoff
     ).order_by('-date')[:50]  # Limit to 50 most recent
     
-    if cached_messages.exists():
+    if cached_messages.exists() and not force_refresh:
         # Use cached message headers
         messages = []
         for cached_msg in cached_messages:
@@ -129,11 +130,36 @@ def inbox(request, folder_name='INBOX'):
                     'error': f'Failed to fetch messages: {str(e)}'
                 })
     
+    # Calculate unread message counts for each folder
+    unread_counts = {}
+    for folder_name in folders:
+        try:
+            folder_obj = Folder.objects.get(account=account, name=folder_name, is_active=True)
+            # Get all cached messages for this folder and count unread in Python
+            # (SQLite doesn't support contains lookup on JSON fields)
+            # In IMAP, messages are unread if they DON'T have the \\Seen flag
+            cached_messages = CachedMessage.objects.filter(
+                account=account,
+                folder=folder_obj
+            )
+            unread_count = sum(1 for msg in cached_messages if '\\Seen' not in msg.flags)
+            unread_counts[folder_name] = unread_count
+        except Folder.DoesNotExist:
+            unread_counts[folder_name] = 0
+    
+    # Build folders_with_counts for template iteration
+    folders_with_counts = [
+        {'name': f, 'unread': unread_counts.get(f, 0)} 
+        for f in folders
+    ]
+    
     context = {
         'account': account,
         'folders': folders,
+        'folders_with_counts': folders_with_counts,
         'messages': messages,
         'current_folder': current_folder,
+        'unread_counts': unread_counts,
     }
     
     return render(request, 'mail/inbox.html', context)
@@ -197,11 +223,36 @@ def message_detail(request, uid):
     if not message:
         raise Http404('Message not found')
 
+    # Calculate unread message counts for each folder
+    unread_counts = {}
+    for folder_name in folders:
+        try:
+            folder_obj = Folder.objects.get(account=account, name=folder_name, is_active=True)
+            # Get all cached messages for this folder and count unread in Python
+            # (SQLite doesn't support contains lookup on JSON fields)
+            # In IMAP, messages are unread if they DON'T have the \Seen flag
+            cached_messages = CachedMessage.objects.filter(
+                account=account,
+                folder=folder_obj
+            )
+            unread_count = sum(1 for msg in cached_messages if '\\Seen' not in msg.flags)
+            unread_counts[folder_name] = unread_count
+        except Folder.DoesNotExist:
+            unread_counts[folder_name] = 0
+    
+    # Build folders_with_counts for template iteration
+    folders_with_counts = [
+        {'name': f, 'unread': unread_counts.get(f, 0)} 
+        for f in folders
+    ]
+    
     return render(request, 'mail/message_detail.html', {
         'account': account,
         'message': message,
         'current_folder': selected_folder,
         'folders': folders,
+        'folders_with_counts': folders_with_counts,
+        'unread_counts': unread_counts,
     })
 
 

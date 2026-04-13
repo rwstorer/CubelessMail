@@ -5,9 +5,10 @@
 {% block sidebar %}
 <div class="sidebar-section">
     <div class="sidebar-section-title">Folders</div>
-    {% for folder in folders %}
-        <a href="{% url 'folder_inbox' folder_name=folder %}" class="sidebar-item {% if folder == current_folder %}active{% endif %}">
-            {{ folder }}
+    {% for folder_data in folders_with_counts %}
+        <a href="{% url 'folder_inbox' folder_data.name %}" class="folder-link {% if folder_data.name == current_folder %}active{% endif %}">
+            {{ folder_data.name }}
+            {% if folder_data.unread %}<span class="unread-badge">({{ folder_data.unread }})</span>{% endif %}
         </a>
     {% empty %}
         <div class="sidebar-item">No folders found</div>

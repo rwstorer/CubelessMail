@@ -5,9 +5,10 @@
 {% block sidebar %}
 <div class="sidebar-section">
     <div class="sidebar-section-title">Folders</div>
-    {% for folder in folders %}
-        <a href="{% url 'folder_inbox' folder_name=folder %}" class="sidebar-item {% if folder == current_folder %}active{% endif %}">
-            {{ folder }}
+    {% for folder_data in folders_with_counts %}
+        <a href="{% url 'folder_inbox' folder_data.name %}" class="folder-link {% if folder_data.name == current_folder %}active{% endif %}">
+            {{ folder_data.name }}
+            {% if folder_data.unread %}<span class="unread-badge">({{ folder_data.unread }})</span>{% endif %}
         </a>
     {% empty %}
         <div class="sidebar-item">No folders found</div>
@@ -91,11 +92,11 @@
     color: var(--text-color);
 }
 
-.message-preview {
-    max-width: 600px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.unread-badge {
+    color: var(--accent-color);
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-left: 0.5rem;
 }
 </style>
 
@@ -128,7 +129,7 @@ function showNewMessageNotification(newCount) {
     notification.innerHTML = `
         <div class="notification-content">
             <strong>${newCount} new message${newCount > 1 ? 's' : ''}</strong>
-            <button onclick="location.reload()">Refresh</button>
+            <button onclick="location.href = location.href.split('?')[0] + '?refresh=1'">Refresh</button>
         </div>
     `;
     

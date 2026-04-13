@@ -16,6 +16,7 @@
   --btn-secondary-hover: #e8e8e8;
   --btn-secondary-text: #333333;
   --btn-secondary-border: #dddddd;
+  --accent-color: #0066cc;
 }
 
 /* Dark theme */
@@ -35,6 +36,7 @@
   --btn-secondary-hover: #4a4a4a;
   --btn-secondary-text: #f0f0f0;
   --btn-secondary-border: #404040;
+  --accent-color: #7ab8ff;
 }
 
 /* CubelessMail - Main Stylesheet */
@@ -146,6 +148,35 @@ main {
   border-left-color: var(--active-border);
   font-weight: 500;
   color: #ffffff;
+}
+
+.folder-link {
+  display: block;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.2s ease;
+  color: var(--text-color);
+  text-decoration: none;
+  line-height: 1.4;
+}
+
+.folder-link:hover {
+  background: var(--hover-bg);
+}
+
+.folder-link.active {
+  background: var(--active-bg);
+  border-left-color: var(--active-border);
+  font-weight: 600;
+  color: var(--active-border);
+}
+
+.unread-badge {
+  color: var(--accent-color);
+  font-weight: 600;
+  font-size: 0.9em;
+  margin-left: 0.5rem;
 }
 
 /* Content Area */
