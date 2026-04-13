@@ -353,3 +353,61 @@ def inline_image(request, uid, part_index):
         raise
     except Exception as e:
         raise Http404(f'Failed to load inline image: {str(e)}')
+
+
+def download_attachment(request, uid, part_index):
+    """Serve non-inline attachment bytes for download."""
+    account = EmailAccount.objects.first()
+    if not account:
+        raise Http404('No email account configured')
+
+    selected_folder = request.GET.get('folder', 'INBOX')
+
+    try:
+        with IMAPEmailClient(
+            account.imap_host,
+            account.imap_username,
+            account.imap_password,
+            port=account.imap_port
+        ) as client:
+            client.client.select_folder(selected_folder)
+            response = client.client.fetch([uid], ['RFC822'])
+            if uid not in response:
+                raise Http404('Message not found')
+
+            email_obj = client._parse_email(response[uid][b'RFC822'])
+            parts = list(email_obj.walk())
+
+            if part_index < 0 or part_index >= len(parts):
+                raise Http404('Attachment part not found')
+
+            part = parts[part_index]
+            if part.is_multipart():
+                raise Http404('Requested part is not a downloadable attachment')
+
+            disposition = (part.get_content_disposition() or '').lower()
+            filename = part.get_filename()
+            content_id = (part.get('Content-ID') or '').strip()
+
+            is_inline_cid = bool(content_id) and disposition != 'attachment'
+            is_attachment = disposition == 'attachment' or (filename and not is_inline_cid)
+            if not is_attachment:
+                raise Http404('Requested part is not a non-inline attachment')
+
+            payload = part.get_payload(decode=True)
+            if payload is None:
+                raise Http404('Attachment data not available')
+
+            content_type = part.get_content_type().lower()
+            safe_name = filename or f'attachment-{part_index}'
+
+            response_obj = HttpResponse(payload, content_type=content_type)
+            response_obj['Content-Disposition'] = f'attachment; filename="{safe_name}"'
+            response_obj['Cache-Control'] = 'private, max-age=300'
+            response_obj['X-Content-Type-Options'] = 'nosniff'
+            return response_obj
+
+    except Http404:
+        raise
+    except Exception as e:
+        raise Http404(f'Failed to load attachment: {str(e)}')

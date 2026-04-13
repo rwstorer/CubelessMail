@@ -168,6 +168,7 @@ class IMAPEmailClient:
                 html_with_cid_urls,
                 allow_remote_images=allow_remote_images,
             )
+            attachments = self._extract_attachments(email_obj)
             return {
                 'uid': uid,
                 'subject': email_obj.get('subject', '(no subject)'),
@@ -179,6 +180,7 @@ class IMAPEmailClient:
                 'has_html': bool(sanitized['html']),
                 'blocked_remote_images': sanitized['blocked_remote_images'],
                 'inline_cid_images': inline_cid_count,
+                'attachments': attachments,
                 'raw': email_obj,
             }
         except Exception as e:
@@ -414,6 +416,37 @@ class IMAPEmailClient:
 
         rewritten_html = cid_pattern.sub(_replace_cid, html_body)
         return rewritten_html, replaced_count
+
+    def _extract_attachments(self, email_obj):
+        """Extract non-inline attachment metadata for download links."""
+        attachments = []
+
+        for idx, part in enumerate(email_obj.walk()):
+            if part.is_multipart():
+                continue
+
+            disposition = (part.get_content_disposition() or '').lower()
+            filename = part.get_filename()
+            content_id = (part.get('Content-ID') or '').strip()
+            content_type = part.get_content_type().lower()
+
+            is_inline_cid = bool(content_id) and disposition != 'attachment'
+            is_attachment = disposition == 'attachment' or (filename and not is_inline_cid)
+
+            if not is_attachment:
+                continue
+
+            payload = part.get_payload(decode=True) or b''
+            safe_name = filename or f'attachment-{idx}'
+
+            attachments.append({
+                'part_index': idx,
+                'filename': safe_name,
+                'content_type': content_type,
+                'size': len(payload),
+            })
+
+        return attachments
 
     def sync_folders_cache(self, account, FolderModel):
         """

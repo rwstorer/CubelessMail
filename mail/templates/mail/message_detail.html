@@ -41,5 +41,19 @@
             {{ message.body|linebreaksbr }}
         </div>
     {% endif %}
+
+    {% if message.attachments %}
+        <div class="message-attachments p-3" style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem;">
+            <h3 style="margin-bottom: 0.75rem;">Attachments</h3>
+            <ul style="margin-left: 1.25rem;">
+                {% for attachment in message.attachments %}
+                    <li>
+                        <a href="{% url 'download_attachment' uid=message.uid part_index=attachment.part_index %}?folder={{ current_folder|urlencode }}">{{ attachment.filename }}</a>
+                        <span class="text-small text-muted">({{ attachment.content_type }}, {{ attachment.size|filesizeformat }})</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
 </div>
 {% endblock %}
