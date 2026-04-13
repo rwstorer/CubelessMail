@@ -23,8 +23,23 @@
     <p class="text-small text-muted">From: {{ message.sender }}</p>
     <p class="text-small text-muted">Date: {{ message.date }}</p>
 
-    <div class="message-body p-3" style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem; white-space: pre-wrap;">
-        {{ message.body|linebreaksbr }}
-    </div>
+    {% if message.has_html and not load_remote_images and message.blocked_remote_images > 0 %}
+        <div class="message-remote-images-notice p-3 mt-3" style="background: var(--hover-bg); border: 1px solid var(--border-color); border-radius: 8px;">
+            <span class="text-small text-muted">
+                Blocked {{ message.blocked_remote_images }} remote image{{ message.blocked_remote_images|pluralize }} for privacy.
+            </span>
+            <a href="{% url 'message_detail' uid=message.uid %}?folder={{ current_folder|urlencode }}&load_remote=1" class="btn btn-secondary btn-small" style="margin-left: 0.75rem;">Load remote images</a>
+        </div>
+    {% endif %}
+
+    {% if message.has_html %}
+        <div class="message-body p-3" style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem;">
+            {{ message.body_html|safe }}
+        </div>
+    {% else %}
+        <div class="message-body p-3" style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem; white-space: pre-wrap;">
+            {{ message.body|linebreaksbr }}
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -1,4 +1,4 @@
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from datetime import timedelta
@@ -175,6 +175,7 @@ def message_detail(request, uid):
         })
 
     selected_folder = request.GET.get('folder', 'INBOX')
+    load_remote_images = request.GET.get('load_remote') == '1'
     
     # Try to get cached folders first (10 minute cache)
     cache_cutoff = timezone.now() - timedelta(minutes=10)
@@ -213,7 +214,11 @@ def message_detail(request, uid):
             account.imap_password,
             port=account.imap_port
         ) as client:
-            message = client.fetch_email_by_uid(uid, folder=selected_folder)
+            message = client.fetch_email_by_uid(
+                uid,
+                folder=selected_folder,
+                allow_remote_images=load_remote_images,
+            )
 
     except Exception as e:
         return render(request, 'mail/error.html', {
@@ -250,6 +255,7 @@ def message_detail(request, uid):
         'account': account,
         'message': message,
         'current_folder': selected_folder,
+        'load_remote_images': load_remote_images,
         'folders': folders,
         'folders_with_counts': folders_with_counts,
         'unread_counts': unread_counts,
@@ -295,3 +301,55 @@ def check_new_messages(request):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def inline_image(request, uid, part_index):
+    """Serve inline CID image bytes for a specific message MIME part."""
+    account = EmailAccount.objects.first()
+    if not account:
+        raise Http404('No email account configured')
+
+    selected_folder = request.GET.get('folder', 'INBOX')
+
+    try:
+        with IMAPEmailClient(
+            account.imap_host,
+            account.imap_username,
+            account.imap_password,
+            port=account.imap_port
+        ) as client:
+            client.client.select_folder(selected_folder)
+            response = client.client.fetch([uid], ['RFC822'])
+            if uid not in response:
+                raise Http404('Message not found')
+
+            email_obj = client._parse_email(response[uid][b'RFC822'])
+            parts = list(email_obj.walk())
+
+            if part_index < 0 or part_index >= len(parts):
+                raise Http404('Inline image part not found')
+
+            part = parts[part_index]
+            content_type = part.get_content_type().lower()
+            disposition = (part.get_content_disposition() or '').lower()
+
+            if not content_type.startswith('image/'):
+                raise Http404('Requested part is not an image')
+
+            # Inline images generally have Content-ID and are not attachments.
+            if disposition == 'attachment' or not part.get('Content-ID'):
+                raise Http404('Requested image is not an inline CID part')
+
+            payload = part.get_payload(decode=True)
+            if payload is None:
+                raise Http404('Inline image data not available')
+
+            response_obj = HttpResponse(payload, content_type=content_type)
+            response_obj['Cache-Control'] = 'private, max-age=300'
+            response_obj['X-Content-Type-Options'] = 'nosniff'
+            return response_obj
+
+    except Http404:
+        raise
+    except Exception as e:
+        raise Http404(f'Failed to load inline image: {str(e)}')
