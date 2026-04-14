@@ -366,10 +366,6 @@
             <h1>CubelessMail</h1>
         </div>
         <p>A lightweight, open-source web-based email client</p>
-        <div class="header-cta">
-            <a href="https://github.com/rwstorer/CubelessMail" class="btn btn-primary">View on GitHub</a>
-            <a href="#features" class="btn btn-secondary">Learn More</a>
-        </div>
     </div>
 
     <!-- Demo Banner -->
@@ -429,21 +425,21 @@
         const messages = [
             {
                 id: 1,
-                sender: "Sarah Chen",
-                subject: "Project kickoff meeting scheduled",
-                preview: "Hi team! I've scheduled our kickoff for next Tuesday at 2 PM. Please add it to your calendars...",
-                body: "Hi team!\n\nI've scheduled our kickoff meeting for next Tuesday, April 22 at 2 PM EST. Please add it to your calendars and come prepared with your initial thoughts on the timeline and scope.\n\nLooking forward to seeing everyone there!\n\nBest,\nSarah",
-                from: "sarah@company.com",
+                sender: "Owner",
+                subject: "Features",
+                preview: "CubelessMail is my attempt to create a Python, Django, Tailwind version of RoundCube....",
+                body: "<h1>CubelessMail</h1>\n<h2>Introduction</h2>\n<p>CubelessMail is my attempt to create a Python, Django, Tailwind version of RoundCube.</p>\n<h2>Project Goals</h2>\n<ul>\n  <li>Modern web user interface<ul>\n<li>threaded emails (maybe)</li>\n<li>right-click actions (maybe)</li>\n<li>end users choose color scheme (maybe)</li>\n</ul>\n</li>\n<li>IMAPS only</li>\n<li>SMTP (secure only)\n<ul>\n<li>Implicit TLS (SMTPS)</li>\n<li>STARTTLS</li>\n</ul>\n</li>\n<li>CALDAV calendar (eventually)</li>\n<li>Contact management (eventually)</li>\n</ul>",
+                from: "owner@company.com",
                 date: "Apr 14, 10:32 AM",
                 unread: true
             },
             {
                 id: 2,
-                sender: "Alex Rodriguez",
+                sender: "Someone",
                 subject: "Code review: Feature branch",
                 preview: "Thanks for submitting the PR. I've left some comments on the implementation. Overall looking good!",
-                body: "Thanks for submitting the PR!\n\nI've reviewed your feature branch and left some comments. Overall the implementation looks solid. A few suggestions:\n\n1. Consider extracting the validation logic into a separate function\n2. Add unit tests for edge cases\n3. Update the documentation\n\nGreat work! Let me know if you have questions.\n\nCheers,\nAlex",
-                from: "alex@company.com",
+                body: "Thanks for submitting the PR!\n\nI've reviewed your feature branch and left some comments. Overall the implementation looks solid. A few suggestions:\n\n1. Consider extracting the validation logic into a separate function\n2. Add unit tests for edge cases\n3. Update the documentation\n\nGreat work! Let me know if you have questions.\n\nCheers,\nSomeone",
+                from: "someone@company.com",
                 date: "Apr 14, 9:15 AM",
                 unread: true
             },
@@ -534,7 +530,7 @@
 
     <!-- Footer -->
     <div class="footer">
-        <p>&copy; 2026 Ray Storer. All rights reserved. | <a href="https://github.com/rwstorer/CubelessMail">GitHub Repository</a> | <a href="https://github.com/rwstorer/CubelessMail/blob/main/LICENSE">License</a></p>
+        <p>&copy; 2026 Ray Storer. All rights reserved. | <a href="https://github.com/rwstorer/CubelessMail">GitHub Repository</a> | <a href="LICENSE.txt">License</a></p>
     </div>
 </body>
 </html>
