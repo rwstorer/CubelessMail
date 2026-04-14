@@ -91,6 +91,51 @@ class IMAPEmailClient:
         except Exception as e:
             raise RuntimeError(f"Failed to delete folder '{name}': {str(e)}")
 
+    def delete_message(self, uid, folder):
+        """Move message to Trash, or expunge if already in Trash."""
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+        self.client.select_folder(folder)
+        available = {f[2] for f in self.client.list_folders()}
+        trash_candidates = ['Trash', 'Deleted Items', 'INBOX.Trash', 'INBOX/Trash']
+        trash = next((c for c in trash_candidates if c in available), None)
+        if trash and folder.lower() not in {'trash', 'deleted items'}:
+            self.client.move([uid], trash)
+        else:
+            self.client.add_flags([uid], [b'\\Deleted'])
+            self.client.expunge()
+
+    def archive_message(self, uid, folder):
+        """Move message to Archive folder, creating it if necessary."""
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+        self.client.select_folder(folder)
+        available = {f[2] for f in self.client.list_folders()}
+        archive_candidates = ['Archive', 'Archives', 'INBOX.Archive', 'INBOX/Archive']
+        archive = next((c for c in archive_candidates if c in available), None)
+        if archive is None:
+            self.client.create_folder('Archive')
+            archive = 'Archive'
+        self.client.move([uid], archive)
+
+    def move_message(self, uid, from_folder, to_folder):
+        """Move message from one folder to another."""
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+        self.client.select_folder(from_folder)
+        self.client.move([uid], to_folder)
+
+    def set_flag(self, uid, folder, flag, add=True):
+        """Add or remove an IMAP flag on a message."""
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+        flag_bytes = flag.encode() if isinstance(flag, str) else flag
+        self.client.select_folder(folder)
+        if add:
+            self.client.add_flags([uid], [flag_bytes])
+        else:
+            self.client.remove_flags([uid], [flag_bytes])
+
     def search_messages(self, folder, term, search_in='headers'):
         """
         Search for messages in a folder via IMAP SEARCH.
@@ -254,10 +299,14 @@ class IMAPEmailClient:
 
         try:
             self.client.select_folder(folder)
-            response = self.client.fetch([uid], ['RFC822'])
+            response = self.client.fetch([uid], ['RFC822', 'FLAGS'])
             if uid not in response:
                 return None
 
+            flags = [
+                f.decode() if isinstance(f, bytes) else str(f)
+                for f in response[uid].get(b'FLAGS', [])
+            ]
             email_obj = self._parse_email(response[uid][b'RFC822'])
             bodies = self._extract_bodies(email_obj)
             html_with_cid_urls, inline_cid_count = self._rewrite_cid_sources(
@@ -283,6 +332,7 @@ class IMAPEmailClient:
                 'blocked_remote_images': sanitized['blocked_remote_images'],
                 'inline_cid_images': inline_cid_count,
                 'attachments': attachments,
+                'flags': flags,
                 'raw': email_obj,
             }
         except Exception as e:

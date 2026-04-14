@@ -10,5 +10,10 @@ urlpatterns = [
     path('message/<int:uid>/attachment/<int:part_index>/', views.download_attachment, name='download_attachment'),
     path('folders/create/', views.create_folder, name='create_folder'),
     path('folders/delete/', views.delete_folder, name='delete_folder'),
+    path('message/<int:uid>/delete/', views.message_delete, name='message_delete'),
+    path('message/<int:uid>/archive/', views.message_archive, name='message_archive'),
+    path('message/<int:uid>/move/', views.message_move, name='message_move'),
+    path('message/<int:uid>/mark-unread/', views.message_mark_unread, name='message_mark_unread'),
+    path('message/<int:uid>/flag/', views.message_flag, name='message_flag'),
     path('api/check-new-messages/', views.check_new_messages, name='check_new_messages'),
 ]

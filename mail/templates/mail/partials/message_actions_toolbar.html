@@ -1,0 +1,72 @@
+{% load mail %}
+<div class="message-actions-toolbar" data-uid="{{ message.uid }}">
+
+    {# ── Left group: non-destructive ─────────────────────────────── #}
+    <div class="msg-action-group">
+
+        {# Mark unread #}
+        <form method="post" action="{% url 'message_mark_unread' uid=message.uid %}" class="js-pane-action-form" data-pane-action="stay">
+            {% csrf_token %}
+            <input type="hidden" name="folder" value="{{ current_folder }}">
+            <button type="submit" class="msg-action-btn" title="Mark as unread">
+                Mark unread
+            </button>
+        </form>
+
+        {# Flag / Unflag #}
+        <form method="post" action="{% url 'message_flag' uid=message.uid %}" class="js-pane-action-form" data-pane-action="stay">
+            {% csrf_token %}
+            <input type="hidden" name="folder" value="{{ current_folder }}">
+            <input type="hidden" name="flagged" value="{% if message.flags|has_imap_flag:'Flagged' %}0{% else %}1{% endif %}">
+            <input type="hidden" name="next" value="detail">
+            <button type="submit"
+                    class="msg-action-btn {% if message.flags|has_imap_flag:'Flagged' %}msg-action-btn--active{% endif %}"
+                    title="{% if message.flags|has_imap_flag:'Flagged' %}Remove flag{% else %}Flag message{% endif %}">
+                {% if message.flags|has_imap_flag:'Flagged' %}&#9733; Flagged{% else %}&#9734; Flag{% endif %}
+            </button>
+        </form>
+
+        {# Move to folder #}
+        {% if folders_with_counts %}
+        <form method="post" action="{% url 'message_move' uid=message.uid %}" class="msg-action-move-form js-pane-action-form" data-pane-action="remove">
+            {% csrf_token %}
+            <input type="hidden" name="folder" value="{{ current_folder }}">
+            <select name="to_folder" class="msg-action-select" aria-label="Move to folder">
+                <option value="">Move to…</option>
+                {% for fd in folders_with_counts %}
+                    {% if fd.name != current_folder %}
+                        <option value="{{ fd.name }}">{{ fd.name }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            <button type="submit" class="msg-action-btn">Go</button>
+        </form>
+        {% endif %}
+
+    </div>
+
+    {# ── Right group: destructive ─────────────────────────────────── #}
+    <div class="msg-action-group msg-action-group--right">
+
+        {# Archive #}
+        <form method="post" action="{% url 'message_archive' uid=message.uid %}" class="js-pane-action-form" data-pane-action="remove">
+            {% csrf_token %}
+            <input type="hidden" name="folder" value="{{ current_folder }}">
+            <button type="submit" class="msg-action-btn" title="Archive">
+                &#128451; Archive
+            </button>
+        </form>
+
+        {# Delete #}
+        <form method="post" action="{% url 'message_delete' uid=message.uid %}" class="js-pane-action-form" data-pane-action="remove">
+            {% csrf_token %}
+            <input type="hidden" name="folder" value="{{ current_folder }}">
+            <button type="submit" class="msg-action-btn msg-action-btn--destructive"
+                    title="Delete"
+                    onclick="return confirm('Delete this message?')">
+                &#128465; Delete
+            </button>
+        </form>
+
+    </div>
+</div>

@@ -1,4 +1,5 @@
 <div class="message-detail-fragment">
+    {% include 'mail/partials/message_actions_toolbar.html' %}
     <div class="p-4">
         <h2>{{ message.subject }}</h2>
         <p class="text-small text-muted">From: {{ message.sender }}</p>

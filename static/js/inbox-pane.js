@@ -102,6 +102,71 @@ document.addEventListener('DOMContentLoaded', function () {
     loadFragment(link.dataset.fragmentUrl);
   });
 
+  // Keep message actions inside the detail pane on desktop/tablet.
+  detailPane.addEventListener('submit', function (event) {
+    if (window.innerWidth < MOBILE_BREAKPOINT) {
+      return;
+    }
+
+    const form = event.target.closest('form.js-pane-action-form');
+    if (!form) {
+      return;
+    }
+
+    // Ignore empty move submissions.
+    const moveSelect = form.querySelector('select[name="to_folder"]');
+    if (moveSelect && !moveSelect.value) {
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+
+    const actionMode = form.dataset.paneAction || 'stay';
+    const formData = new FormData(form);
+    if (actionMode === 'stay') {
+      formData.set('next', 'fragment');
+    } else {
+      formData.set('next', 'pane');
+    }
+
+    showLoading();
+
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(function (response) {
+        if (actionMode === 'remove' && response.status === 204) {
+          const selected = activeUid
+            ? listPane.querySelector('[data-uid="' + CSS.escape(String(activeUid)) + '"]')
+            : null;
+          if (selected) {
+            selected.remove();
+          }
+          activeUid = null;
+          detailPane.innerHTML = '<div class="detail-pane-empty"><p class="text-muted">Select a message to read it</p></div>';
+          return null;
+        }
+        if (!response.ok) {
+          throw new Error('Bad response: ' + response.status);
+        }
+        return response.text();
+      })
+      .then(function (html) {
+        if (html === null) {
+          return;
+        }
+        detailPane.innerHTML = html;
+      })
+      .catch(function () {
+        showError();
+      });
+  }, true);
+
   function selectItem(item) {
     listPane.querySelectorAll('.message-item').forEach(function (el) {
       el.classList.remove('selected');

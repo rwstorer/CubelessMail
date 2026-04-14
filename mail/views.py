@@ -1,7 +1,9 @@
 from django.http import Http404, HttpResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from urllib.parse import quote
 from datetime import timedelta
 from .models import EmailAccount, Folder, CachedMessage
 from .imap_client import IMAPEmailClient
@@ -348,14 +350,182 @@ def message_detail_fragment(request, uid):
             content_type='text/html',
         )
 
+    # Build folders_with_counts for the Move dropdown in the action toolbar.
+    cache_cutoff = timezone.now() - timedelta(minutes=10)
+    folders = list(
+        Folder.objects.filter(
+            account=account,
+            last_updated__gte=cache_cutoff,
+            is_active=True,
+        ).values_list('name', flat=True)
+    ) or list(
+        Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
+    )
+    folders_with_counts = [
+        {'name': f, 'unread': 0, 'is_special': _is_special_folder(f)}
+        for f in folders
+    ]
+
     return render(request, 'mail/partials/message_detail_body.html', {
         'message': message,
         'current_folder': selected_folder,
         'load_remote_images': load_remote_images,
+        'folders_with_counts': folders_with_counts,
     })
 
 
 from django.http import JsonResponse
+
+
+def _folder_redirect(folder_name):
+    """Redirect to the appropriate inbox URL for a folder."""
+    if folder_name == 'INBOX':
+        return redirect('inbox')
+    return redirect('folder_inbox', folder_name=folder_name)
+
+
+@require_POST
+def message_delete(request, uid):
+    """Move message to Trash (or expunge if already in Trash)."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return redirect('inbox')
+    folder = request.POST.get('folder', 'INBOX').strip()
+    try:
+        with IMAPEmailClient(
+            account.imap_host, account.imap_username, account.imap_password,
+            port=account.imap_port,
+        ) as client:
+            client.delete_message(uid, folder)
+    except Exception:
+        pass
+    CachedMessage.objects.filter(
+        account=account, folder__name=folder, uid=str(uid)
+    ).delete()
+    if request.POST.get('next') == 'pane':
+        return HttpResponse(status=204)
+    return _folder_redirect(folder)
+
+
+@require_POST
+def message_archive(request, uid):
+    """Move message to Archive folder."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return redirect('inbox')
+    folder = request.POST.get('folder', 'INBOX').strip()
+    try:
+        with IMAPEmailClient(
+            account.imap_host, account.imap_username, account.imap_password,
+            port=account.imap_port,
+        ) as client:
+            client.archive_message(uid, folder)
+            # Ensure Archive folder is in our cache.
+            client.sync_folders_cache(account, Folder)
+    except Exception:
+        pass
+    CachedMessage.objects.filter(
+        account=account, folder__name=folder, uid=str(uid)
+    ).delete()
+    if request.POST.get('next') == 'pane':
+        return HttpResponse(status=204)
+    return _folder_redirect(folder)
+
+
+@require_POST
+def message_move(request, uid):
+    """Move message to a different folder."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return redirect('inbox')
+    folder = request.POST.get('folder', 'INBOX').strip()
+    to_folder = request.POST.get('to_folder', '').strip()
+    if not to_folder:
+        if request.POST.get('next') == 'pane':
+            return HttpResponse(status=204)
+        return _folder_redirect(folder)
+    try:
+        with IMAPEmailClient(
+            account.imap_host, account.imap_username, account.imap_password,
+            port=account.imap_port,
+        ) as client:
+            client.move_message(uid, folder, to_folder)
+    except Exception:
+        pass
+    CachedMessage.objects.filter(
+        account=account, folder__name=folder, uid=str(uid)
+    ).delete()
+    if request.POST.get('next') == 'pane':
+        return HttpResponse(status=204)
+    return _folder_redirect(folder)
+
+
+@require_POST
+def message_mark_unread(request, uid):
+    """Remove the \\Seen flag from a message."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return redirect('inbox')
+    folder = request.POST.get('folder', 'INBOX').strip()
+    try:
+        with IMAPEmailClient(
+            account.imap_host, account.imap_username, account.imap_password,
+            port=account.imap_port,
+        ) as client:
+            client.set_flag(uid, folder, '\\Seen', add=False)
+    except Exception:
+        pass
+    # Patch the cached flags so the unread badge updates immediately.
+    try:
+        cached = CachedMessage.objects.get(
+            account=account, folder__name=folder, uid=str(uid)
+        )
+        flags = [f for f in (cached.flags or []) if f != '\\Seen']
+        cached.flags = flags
+        cached.save(update_fields=['flags'])
+    except CachedMessage.DoesNotExist:
+        pass
+    if request.POST.get('next') == 'fragment':
+        url = reverse('message_detail_fragment', args=[uid]) + f'?folder={quote(folder, safe="")}'
+        return redirect(url)
+    return _folder_redirect(folder)
+
+
+@require_POST
+def message_flag(request, uid):
+    """Toggle the \\Flagged flag on a message."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return redirect('inbox')
+    folder = request.POST.get('folder', 'INBOX').strip()
+    add_flag = request.POST.get('flagged') == '1'
+    try:
+        with IMAPEmailClient(
+            account.imap_host, account.imap_username, account.imap_password,
+            port=account.imap_port,
+        ) as client:
+            client.set_flag(uid, folder, '\\Flagged', add=add_flag)
+    except Exception:
+        pass
+    # Patch the cached flags.
+    try:
+        cached = CachedMessage.objects.get(
+            account=account, folder__name=folder, uid=str(uid)
+        )
+        flags = [f for f in (cached.flags or []) if f != '\\Flagged']
+        if add_flag:
+            flags.append('\\Flagged')
+        cached.flags = flags
+        cached.save(update_fields=['flags'])
+    except CachedMessage.DoesNotExist:
+        pass
+    if request.POST.get('next') == 'fragment':
+        url = reverse('message_detail_fragment', args=[uid]) + f'?folder={quote(folder, safe="")}'
+        return redirect(url)
+    if request.POST.get('next') == 'detail':
+        url = reverse('message_detail', args=[uid]) + f'?folder={quote(folder, safe="")}'
+        return redirect(url)
+    return _folder_redirect(folder)
 
 
 @require_POST
