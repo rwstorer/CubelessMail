@@ -1,11 +1,64 @@
 document.addEventListener('DOMContentLoaded', function () {
   const MOBILE_BREAKPOINT = 768;
+  const LIST_PANE_MIN_HEIGHT = 80;
+  const DETAIL_PANE_MIN_HEIGHT = 80;
+  const STORAGE_KEY = 'cubelessmailListPaneHeight';
 
   const listPane = document.getElementById('inboxListPane');
   const detailPane = document.getElementById('inboxDetailPane');
+  const resizer = document.getElementById('inboxPaneResizer');
 
   if (!listPane || !detailPane) {
     return;
+  }
+
+  // Restore saved list pane height
+  const savedHeight = localStorage.getItem(STORAGE_KEY);
+  if (savedHeight && window.innerWidth >= MOBILE_BREAKPOINT) {
+    listPane.style.flex = '0 0 ' + savedHeight + 'px';
+  }
+
+  // Vertical pane resizing
+  if (resizer) {
+    let isResizing = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    resizer.addEventListener('pointerdown', function (event) {
+      if (window.innerWidth < MOBILE_BREAKPOINT) {
+        return;
+      }
+      isResizing = true;
+      startY = event.clientY;
+      startHeight = listPane.getBoundingClientRect().height;
+      resizer.classList.add('resizing');
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', stopResizing);
+    });
+
+    function handlePointerMove(event) {
+      if (!isResizing) { return; }
+      const containerHeight = listPane.parentElement.getBoundingClientRect().height;
+      const resizerHeight = resizer.getBoundingClientRect().height;
+      const maxHeight = containerHeight - resizerHeight - DETAIL_PANE_MIN_HEIGHT;
+      const delta = event.clientY - startY;
+      const newHeight = Math.min(maxHeight, Math.max(LIST_PANE_MIN_HEIGHT, startHeight + delta));
+      listPane.style.flex = '0 0 ' + newHeight + 'px';
+    }
+
+    function stopResizing() {
+      if (!isResizing) { return; }
+      isResizing = false;
+      resizer.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      const finalHeight = listPane.getBoundingClientRect().height;
+      localStorage.setItem(STORAGE_KEY, Math.round(finalHeight));
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopResizing);
+    }
   }
 
   let activeUid = null;

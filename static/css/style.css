@@ -290,9 +290,20 @@ article.content.split-pane {
 
 .inbox-list-pane {
   flex: 0 0 45%;
-  min-height: 0;
+  min-height: 80px;
   overflow-y: auto;
-  border-bottom: 2px solid var(--border-color);
+}
+
+.inbox-pane-resizer {
+  flex: 0 0 6px;
+  background: var(--border-color);
+  cursor: ns-resize;
+  transition: background 0.15s;
+}
+
+.inbox-pane-resizer:hover,
+.inbox-pane-resizer.resizing {
+  background: var(--active-border);
 }
 
 .inbox-detail-pane {
@@ -327,8 +338,11 @@ article.content.split-pane {
 
   .inbox-list-pane {
     overflow-y: visible;
-    border-bottom: none;
     height: auto;
+  }
+
+  .inbox-pane-resizer {
+    display: none;
   }
 
   .inbox-detail-pane {
