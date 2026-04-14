@@ -91,6 +91,89 @@ class IMAPEmailClient:
         except Exception as e:
             raise RuntimeError(f"Failed to delete folder '{name}': {str(e)}")
 
+    def search_messages(self, folder, term, search_in='headers'):
+        """
+        Search for messages in a folder via IMAP SEARCH.
+
+        Args:
+            folder: Folder name to search in
+            term: Search term string
+            search_in: 'headers' searches Subject + From; 'text' searches full message text
+
+        Returns:
+            List of message dicts (same shape as sync_messages_cache output),
+            sorted newest-first, capped at 200 results.
+        """
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+
+        try:
+            self.client.select_folder(folder)
+
+            if search_in == 'text':
+                criteria = ['TEXT', term]
+            else:
+                criteria = ['OR', 'SUBJECT', term, 'FROM', term]
+
+            # Try with UTF-8 charset first; fall back if server rejects it.
+            try:
+                msg_ids = self.client.search(criteria, charset='UTF-8')
+            except Exception:
+                msg_ids = self.client.search(criteria)
+
+            if not msg_ids:
+                return []
+
+            # Most recent first, cap at 200.
+            msg_ids = sorted(msg_ids, reverse=True)[:200]
+
+            response = self.client.fetch(
+                msg_ids, ['ENVELOPE', 'RFC822.SIZE', 'FLAGS', 'BODYSTRUCTURE']
+            )
+
+            messages = []
+            for msg_id, msg_data in response.items():
+                try:
+                    envelope = msg_data.get(b'ENVELOPE')
+                    if not envelope:
+                        continue
+                    subject = (
+                        envelope.subject.decode('utf-8', errors='ignore')
+                        if envelope.subject else ''
+                    )
+                    sender = str(envelope.from_[0]) if envelope.from_ else ''
+                    sender_name = self._extract_sender_name(sender)
+                    date = envelope.date
+                    size = msg_data.get(b'RFC822.SIZE', 0)
+                    bodystructure = msg_data.get(b'BODYSTRUCTURE')
+                    has_attachments = self._has_attachments_from_bodystructure(bodystructure)
+                    flags = [
+                        flag.decode() if isinstance(flag, bytes) else str(flag)
+                        for flag in msg_data.get(b'FLAGS', [])
+                    ]
+                    messages.append({
+                        'uid': str(msg_id),
+                        'subject': subject,
+                        'sender': sender,
+                        'sender_name': sender_name,
+                        'date': date,
+                        'body': '',
+                        'flags': flags,
+                        'size': size,
+                        'has_attachments': has_attachments,
+                    })
+                except Exception:
+                    continue
+
+            messages.sort(
+                key=lambda m: m['date'].timestamp() if m['date'] else 0.0,
+                reverse=True,
+            )
+            return messages
+
+        except Exception as e:
+            raise RuntimeError(f"Search failed in '{folder}': {str(e)}")
+
     def fetch_emails(self, folder='INBOX', limit=None):
         """
         Fetch emails from a folder.

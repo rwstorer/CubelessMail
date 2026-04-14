@@ -12,9 +12,37 @@
 {% block content %}
 <div class="inbox-layout">
     <div class="inbox-list-pane" id="inboxListPane">
-        <div class="p-4" style="padding-bottom: 0.5rem;">
-            <h2>{{ current_folder }}</h2>
-            <p class="text-small text-muted">{{ account.email }} • {{ messages|length }} messages</p>
+        <div class="inbox-list-header">
+            <div class="inbox-list-title">
+                <h2>{{ current_folder }}</h2>
+                <p class="text-small text-muted">
+                    {{ account.email }}
+                    {% if is_search %}
+                        &bull; {{ messages|length }} result{{ messages|length|pluralize }}
+                    {% else %}
+                        &bull; {{ messages|length }} message{{ messages|length|pluralize }}
+                    {% endif %}
+                </p>
+            </div>
+            <form method="get" action="" class="inbox-search-form" role="search">
+                <div class="inbox-search-row">
+                    <input type="search" name="q" value="{{ search_query }}"
+                           placeholder="Search…" class="inbox-search-input"
+                           aria-label="Search messages">
+                    <select name="search_in" class="inbox-search-scope" aria-label="Search in">
+                        <option value="headers"{% if search_in == 'headers' %} selected{% endif %}>Subject / From</option>
+                        <option value="text"{% if search_in == 'text' %} selected{% endif %}>Full text</option>
+                    </select>
+                    <button type="submit" class="inbox-search-submit" aria-label="Search">&#128269;</button>
+                </div>
+            </form>
+            {% if is_search %}
+            <div class="inbox-search-active">
+                Searching <em>{% if search_in == 'text' %}all fields{% else %}subject &amp; from{% endif %}</em>
+                for <strong>{{ search_query }}</strong>
+                &mdash; <a href="{{ request.path }}">Clear</a>
+            </div>
+            {% endif %}
         </div>
         <div class="message-list">
             {% for message in messages %}
@@ -42,7 +70,7 @@
                     </div>
                 </a>
             {% empty %}
-                <p class="text-center text-muted p-4">No messages in {{ current_folder }}</p>
+                <p class="text-center text-muted p-4">{% if is_search %}No results found.{% else %}No messages in {{ current_folder }}{% endif %}</p>
             {% endfor %}
         </div>
     </div>
@@ -189,11 +217,13 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+{% if not is_search %}
 // Start polling every 30 seconds (like Roundcube)
 setInterval(checkForNewMessages, 30000);
 
 // Initial check after 5 seconds
 setTimeout(checkForNewMessages, 5000);
+{% endif %}
 </script>
 
 {% endblock %}
