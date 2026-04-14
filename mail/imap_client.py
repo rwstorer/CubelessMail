@@ -73,6 +73,24 @@ class IMAPEmailClient:
         except Exception as e:
             raise RuntimeError(f"Failed to list folders: {str(e)}")
 
+    def create_folder(self, name):
+        """Create a new folder on the IMAP server."""
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+        try:
+            self.client.create_folder(name)
+        except Exception as e:
+            raise RuntimeError(f"Failed to create folder '{name}': {str(e)}")
+
+    def delete_folder(self, name):
+        """Delete a folder from the IMAP server."""
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
+        try:
+            self.client.delete_folder(name)
+        except Exception as e:
+            raise RuntimeError(f"Failed to delete folder '{name}': {str(e)}")
+
     def fetch_emails(self, folder='INBOX', limit=None):
         """
         Fetch emails from a folder.

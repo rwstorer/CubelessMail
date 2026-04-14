@@ -1,10 +1,29 @@
 from django.http import Http404, HttpResponse
-from django.views.decorators.http import require_GET
-from django.shortcuts import render
+from django.views.decorators.http import require_GET, require_POST
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from datetime import timedelta
 from .models import EmailAccount, Folder, CachedMessage
 from .imap_client import IMAPEmailClient
+
+SPECIAL_FOLDERS = {
+    'inbox', 'sent', 'sent items', 'sent mail', 'drafts', 'trash',
+    'deleted items', 'junk', 'junk email', 'spam', 'archive',
+}
+
+
+def _is_special_folder(name):
+    normalized = name.strip().lower()
+    if normalized in SPECIAL_FOLDERS:
+        return True
+    # Sub-folder hierarchy variants: INBOX.Spam (Dovecot) or INBOX/Spam (Gmail, Courier, etc.)
+    for sep in ('.', '/'):
+        prefix = 'inbox' + sep
+        if normalized.startswith(prefix):
+            suffix = normalized[len(prefix):]
+            if suffix in SPECIAL_FOLDERS:
+                return True
+    return False
 
 
 def inbox(request, folder_name='INBOX'):
@@ -152,7 +171,7 @@ def inbox(request, folder_name='INBOX'):
     
     # Build folders_with_counts for template iteration
     folders_with_counts = [
-        {'name': f, 'unread': unread_counts.get(f, 0)} 
+        {'name': f, 'unread': unread_counts.get(f, 0), 'is_special': _is_special_folder(f)}
         for f in folders
     ]
     
@@ -250,7 +269,7 @@ def message_detail(request, uid):
     
     # Build folders_with_counts for template iteration
     folders_with_counts = [
-        {'name': f, 'unread': unread_counts.get(f, 0)} 
+        {'name': f, 'unread': unread_counts.get(f, 0), 'is_special': _is_special_folder(f)}
         for f in folders
     ]
     
@@ -313,7 +332,52 @@ def message_detail_fragment(request, uid):
 
 
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
+
+
+@require_POST
+def create_folder(request):
+    """Create a new IMAP folder."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return redirect('inbox')
+    folder_name = request.POST.get('folder_name', '').strip()
+    if not folder_name or _is_special_folder(folder_name):
+        return redirect('inbox')
+    try:
+        with IMAPEmailClient(
+            account.imap_host,
+            account.imap_username,
+            account.imap_password,
+            port=account.imap_port,
+        ) as client:
+            client.create_folder(folder_name)
+            client.sync_folders_cache(account, Folder)
+    except Exception:
+        pass
+    return redirect('folder_inbox', folder_name=folder_name)
+
+
+@require_POST
+def delete_folder(request):
+    """Delete an IMAP folder."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return redirect('inbox')
+    folder_name = request.POST.get('folder_name', '').strip()
+    if not folder_name or _is_special_folder(folder_name):
+        return redirect('inbox')
+    try:
+        with IMAPEmailClient(
+            account.imap_host,
+            account.imap_username,
+            account.imap_password,
+            port=account.imap_port,
+        ) as client:
+            client.delete_folder(folder_name)
+        Folder.objects.filter(account=account, name=folder_name).delete()
+    except Exception:
+        pass
+    return redirect('inbox')
 
 
 @require_GET

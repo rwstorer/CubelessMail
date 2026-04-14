@@ -1,0 +1,33 @@
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Folders</div>
+    {% for folder_data in folders_with_counts %}
+        <div class="folder-row">
+            <a href="{% url 'folder_inbox' folder_data.name %}" class="folder-link {% if folder_data.name == current_folder %}active{% endif %}">
+                {{ folder_data.name }}
+                {% if folder_data.unread %}<span class="unread-badge">({{ folder_data.unread }})</span>{% endif %}
+            </a>
+            {% if not folder_data.is_special %}
+                <form method="post" action="{% url 'delete_folder' %}" class="folder-delete-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="folder_name" value="{{ folder_data.name }}">
+                    <button type="submit" class="folder-delete-btn" title="Delete {{ folder_data.name }}"
+                            onclick="return confirm('Delete \u201c{{ folder_data.name|escapejs }}\u201d? Messages inside will be permanently lost.')">&#10005;</button>
+                </form>
+            {% endif %}
+        </div>
+    {% empty %}
+        <div class="sidebar-item">No folders found</div>
+    {% endfor %}
+</div>
+<div class="sidebar-section">
+    <button type="button" class="folder-create-toggle" id="newFolderToggle">+ New folder</button>
+    <form method="post" action="{% url 'create_folder' %}" class="folder-create-form" id="newFolderForm" style="display:none;">
+        {% csrf_token %}
+        <input type="text" name="folder_name" placeholder="Folder name" maxlength="100" required
+               autocomplete="off" class="folder-create-input" id="newFolderInput">
+        <div class="folder-create-btn-row">
+            <button type="submit" class="btn btn-primary btn-small">Create</button>
+            <button type="button" class="btn btn-secondary btn-small" id="newFolderCancel">&#10005;</button>
+        </div>
+    </form>
+</div>

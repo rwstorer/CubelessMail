@@ -6,17 +6,7 @@
 {% block content_class %}split-pane{% endblock %}
 
 {% block sidebar %}
-<div class="sidebar-section">
-    <div class="sidebar-section-title">Folders</div>
-    {% for folder_data in folders_with_counts %}
-        <a href="{% url 'folder_inbox' folder_data.name %}" class="folder-link {% if folder_data.name == current_folder %}active{% endif %}">
-            {{ folder_data.name }}
-            {% if folder_data.unread %}<span class="unread-badge">({{ folder_data.unread }})</span>{% endif %}
-        </a>
-    {% empty %}
-        <div class="sidebar-item">No folders found</div>
-    {% endfor %}
-</div>
+{% include 'mail/partials/sidebar_folders.html' %}
 {% endblock %}
 
 {% block content %}

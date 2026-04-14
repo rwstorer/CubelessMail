@@ -100,4 +100,26 @@ document.addEventListener('DOMContentLoaded', function () {
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', stopResizing);
   }
+
+  // New folder form toggle
+  const newFolderToggle = document.getElementById('newFolderToggle');
+  const newFolderForm = document.getElementById('newFolderForm');
+  const newFolderCancel = document.getElementById('newFolderCancel');
+  const newFolderInput = document.getElementById('newFolderInput');
+
+  if (newFolderToggle && newFolderForm) {
+    newFolderToggle.addEventListener('click', function () {
+      newFolderForm.style.display = 'block';
+      newFolderToggle.style.display = 'none';
+      if (newFolderInput) { newFolderInput.focus(); }
+    });
+  }
+
+  if (newFolderCancel && newFolderForm && newFolderToggle) {
+    newFolderCancel.addEventListener('click', function () {
+      newFolderForm.style.display = 'none';
+      newFolderToggle.style.display = '';
+      if (newFolderInput) { newFolderInput.value = ''; }
+    });
+  }
 });
