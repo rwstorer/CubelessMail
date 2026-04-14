@@ -1,0 +1,42 @@
+<div class="message-detail-fragment">
+    <div class="p-4">
+        <h2>{{ message.subject }}</h2>
+        <p class="text-small text-muted">From: {{ message.sender }}</p>
+        <p class="text-small text-muted">Date: {{ message.date }}</p>
+
+        {% if message.has_html and not load_remote_images and message.blocked_remote_images > 0 %}
+            <div class="message-remote-images-notice p-3" style="background: var(--hover-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem;">
+                <span class="text-small text-muted">
+                    Blocked {{ message.blocked_remote_images }} remote image{{ message.blocked_remote_images|pluralize }} for privacy.
+                </span>
+                <a href="{% url 'message_detail' uid=message.uid %}?folder={{ current_folder|urlencode }}&load_remote=1"
+                   data-fragment-url="{% url 'message_detail_fragment' uid=message.uid %}?folder={{ current_folder|urlencode }}&load_remote=1"
+                   class="btn btn-secondary btn-small" style="margin-left: 0.75rem;">Load remote images</a>
+            </div>
+        {% endif %}
+
+        {% if message.has_html %}
+            <div class="message-body p-3" style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem;">
+                {{ message.body_html|safe }}
+            </div>
+        {% else %}
+            <div class="message-body p-3" style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem; white-space: pre-wrap;">
+                {{ message.body|linebreaksbr }}
+            </div>
+        {% endif %}
+
+        {% if message.attachments %}
+            <div class="message-attachments p-3" style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem;">
+                <h3 style="margin-bottom: 0.75rem;">Attachments</h3>
+                <ul style="margin-left: 1.25rem;">
+                    {% for attachment in message.attachments %}
+                        <li>
+                            <a href="{% url 'download_attachment' uid=message.uid part_index=attachment.part_index %}?folder={{ current_folder|urlencode }}">{{ attachment.filename }}</a>
+                            <span class="text-small text-muted">({{ attachment.content_type }}, {{ attachment.size|filesizeformat }})</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </div>
+</div>

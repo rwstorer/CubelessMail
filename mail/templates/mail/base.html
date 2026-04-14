@@ -31,11 +31,12 @@
             <div class="sidebar-resizer" id="sidebarResizer" aria-label="Resize folders column"></div>
         </aside>
 
-        <article class="content">
+        <article class="content {% block content_class %}{% endblock %}">
             {% block content %}{% endblock %}
         </article>
     </main>
 
     <script src="{% static 'js/sidebar.js' %}"></script>
+    {% block extra_scripts %}{% endblock %}
 </body>
 </html>

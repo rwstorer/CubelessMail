@@ -1,4 +1,5 @@
 from django.http import Http404, HttpResponse
+from django.views.decorators.http import require_GET
 from django.shortcuts import render
 from django.utils import timezone
 from datetime import timedelta
@@ -261,6 +262,53 @@ def message_detail(request, uid):
         'folders': folders,
         'folders_with_counts': folders_with_counts,
         'unread_counts': unread_counts,
+    })
+
+
+@require_GET
+def message_detail_fragment(request, uid):
+    """Returns message detail as an HTML fragment for the inbox split pane."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return HttpResponse(
+            '<p class="text-muted p-4">No email account configured.</p>',
+            status=400,
+            content_type='text/html',
+        )
+
+    selected_folder = request.GET.get('folder', 'INBOX')
+    load_remote_images = request.GET.get('load_remote') == '1'
+
+    try:
+        with IMAPEmailClient(
+            account.imap_host,
+            account.imap_username,
+            account.imap_password,
+            port=account.imap_port,
+        ) as client:
+            message = client.fetch_email_by_uid(
+                uid,
+                folder=selected_folder,
+                allow_remote_images=load_remote_images,
+            )
+    except Exception:
+        return HttpResponse(
+            '<p class="text-muted p-4">Failed to load message.</p>',
+            status=500,
+            content_type='text/html',
+        )
+
+    if not message:
+        return HttpResponse(
+            '<p class="text-muted p-4">Message not found.</p>',
+            status=404,
+            content_type='text/html',
+        )
+
+    return render(request, 'mail/partials/message_detail_body.html', {
+        'message': message,
+        'current_folder': selected_folder,
+        'load_remote_images': load_remote_images,
     })
 
 

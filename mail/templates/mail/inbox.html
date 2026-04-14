@@ -1,6 +1,9 @@
 {% extends 'mail/base.html' %}
+{% load static %}
 
 {% block title %}{{ current_folder }} - CubelessMail{% endblock %}
+
+{% block content_class %}split-pane{% endblock %}
 
 {% block sidebar %}
 <div class="sidebar-section">
@@ -17,35 +20,46 @@
 {% endblock %}
 
 {% block content %}
-<div class="p-4">
-    <h2>{{ current_folder }}</h2>
-    <p class="text-small text-muted">{{ account.email }} • {{ messages|length }} messages</p>
-
-    <div class="message-list">
-        {% for message in messages %}
-            <a href="{% url 'message_detail' uid=message.uid %}?folder={{ current_folder|urlencode }}" class="message-item">
-                <div class="message-header">
-                    <div class="message-sender">
-                        <strong>{{ message.sender_name }}</strong>
-                        <span class="text-small text-muted">{{ message.sender }}</span>
+<div class="inbox-layout">
+    <div class="inbox-list-pane" id="inboxListPane">
+        <div class="p-4" style="padding-bottom: 0.5rem;">
+            <h2>{{ current_folder }}</h2>
+            <p class="text-small text-muted">{{ account.email }} • {{ messages|length }} messages</p>
+        </div>
+        <div class="message-list">
+            {% for message in messages %}
+                <a href="{% url 'message_detail' uid=message.uid %}?folder={{ current_folder|urlencode }}"
+                   data-uid="{{ message.uid }}"
+                   data-fragment-url="{% url 'message_detail_fragment' uid=message.uid %}?folder={{ current_folder|urlencode }}"
+                   class="message-item">
+                    <div class="message-header">
+                        <div class="message-sender">
+                            <strong>{{ message.sender_name }}</strong>
+                            <span class="text-small text-muted">{{ message.sender }}</span>
+                        </div>
+                        <div class="message-date text-small text-muted">
+                            {{ message.date }}
+                        </div>
                     </div>
-                    <div class="message-date text-small text-muted">
-                        {{ message.date }}
+                    <div class="message-subject">
+                        {{ message.subject }}
+                        {% if message.has_attachments %}
+                            <span class="attachment-indicator" title="Has attachments" aria-label="Has attachments">&#128206;</span>
+                        {% endif %}
                     </div>
-                </div>
-                <div class="message-subject">
-                    {{ message.subject }}
-                    {% if message.has_attachments %}
-                        <span class="attachment-indicator" title="Has attachments" aria-label="Has attachments">&#128206;</span>
-                    {% endif %}
-                </div>
-                <div class="message-preview text-small text-muted">
-                    {{ message.body|truncatewords:20 }}
-                </div>
-            </a>
-        {% empty %}
-            <p class="text-center text-muted p-4">No messages in {{ current_folder }}</p>
-        {% endfor %}
+                    <div class="message-preview text-small text-muted">
+                        {{ message.body|truncatewords:20 }}
+                    </div>
+                </a>
+            {% empty %}
+                <p class="text-center text-muted p-4">No messages in {{ current_folder }}</p>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="inbox-detail-pane" id="inboxDetailPane">
+        <div class="detail-pane-empty">
+            <p class="text-muted">Select a message to read it</p>
+        </div>
     </div>
 </div>
 
@@ -106,6 +120,11 @@
     font-weight: 600;
     font-size: 0.9em;
     margin-left: 0.5rem;
+}
+
+.message-item.selected {
+    background: var(--active-bg);
+    border-left: 3px solid var(--active-border);
 }
 </style>
 
@@ -186,4 +205,8 @@ setInterval(checkForNewMessages, 30000);
 setTimeout(checkForNewMessages, 5000);
 </script>
 
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/inbox-pane.js' %}"></script>
 {% endblock %}
