@@ -377,6 +377,76 @@ def message_detail_fragment(request, uid):
 from django.http import JsonResponse
 
 
+VIRTUAL_STARRED = '__starred__'
+
+
+def starred_inbox(request):
+    """Virtual folder showing all flagged/starred messages across all folders."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return render(request, 'mail/no_account.html', {
+            'message': 'No email account configured. Please add one in the admin.'
+        })
+
+    # Collect all cached flagged messages across every folder.
+    flagged_cached = CachedMessage.objects.filter(
+        account=account,
+    ).select_related('folder').order_by('-date')[:200]
+
+    messages = []
+    for cached_msg in flagged_cached:
+        if '\\Flagged' not in cached_msg.flags:
+            continue
+        messages.append({
+            'uid': cached_msg.uid,
+            'subject': cached_msg.subject,
+            'sender': cached_msg.sender,
+            'sender_name': cached_msg.sender_name,
+            'date': cached_msg.date,
+            'flags': cached_msg.flags,
+            'size': cached_msg.size,
+            'has_attachments': cached_msg.has_attachments,
+            'message_folder': cached_msg.folder.name,
+        })
+
+    # Folder list for sidebar.
+    cache_cutoff = timezone.now() - timedelta(minutes=10)
+    cached_folders = Folder.objects.filter(
+        account=account, last_updated__gte=cache_cutoff, is_active=True
+    )
+    folders = list(
+        cached_folders.values_list('name', flat=True)
+    ) or list(
+        Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
+    )
+
+    unread_counts = {}
+    for folder_name in folders:
+        try:
+            folder_obj = Folder.objects.get(account=account, name=folder_name, is_active=True)
+            cached = CachedMessage.objects.filter(account=account, folder=folder_obj)
+            unread_counts[folder_name] = sum(1 for m in cached if '\\Seen' not in m.flags)
+        except Folder.DoesNotExist:
+            unread_counts[folder_name] = 0
+
+    folders_with_counts = [
+        {'name': f, 'unread': unread_counts.get(f, 0), 'is_special': _is_special_folder(f)}
+        for f in folders
+    ]
+
+    return render(request, 'mail/inbox.html', {
+        'account': account,
+        'folders': folders,
+        'folders_with_counts': folders_with_counts,
+        'messages': messages,
+        'current_folder': VIRTUAL_STARRED,
+        'unread_counts': unread_counts,
+        'search_query': '',
+        'search_in': 'headers',
+        'is_search': False,
+    })
+
+
 def _folder_redirect(folder_name):
     """Redirect to the appropriate inbox URL for a folder."""
     if folder_name == 'INBOX':
@@ -485,6 +555,8 @@ def message_mark_unread(request, uid):
         cached.save(update_fields=['flags'])
     except CachedMessage.DoesNotExist:
         pass
+    if request.POST.get('next') == 'toggle':
+        return JsonResponse({'flagged': add_flag})
     if request.POST.get('next') == 'fragment':
         url = reverse('message_detail_fragment', args=[uid]) + f'?folder={quote(folder, safe="")}'
         return redirect(url)
@@ -519,6 +591,8 @@ def message_flag(request, uid):
         cached.save(update_fields=['flags'])
     except CachedMessage.DoesNotExist:
         pass
+    if request.POST.get('next') == 'toggle':
+        return JsonResponse({'flagged': add_flag})
     if request.POST.get('next') == 'fragment':
         url = reverse('message_detail_fragment', args=[uid]) + f'?folder={quote(folder, safe="")}'
         return redirect(url)

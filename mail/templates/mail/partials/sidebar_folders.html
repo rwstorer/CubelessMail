@@ -1,6 +1,11 @@
 {% load mail %}
 <div class="sidebar-section">
     <div class="sidebar-section-title">Folders</div>
+    <div class="folder-row">
+        <a href="{% url 'starred_inbox' %}" class="folder-link {% if current_folder == '__starred__' %}active{% endif %}">
+            <span class="folder-icon" aria-hidden="true">⭐</span> Starred
+        </a>
+    </div>
     {% for folder_data in folders_with_counts %}
         <div class="folder-row">
             <a href="{% url 'folder_inbox' folder_data.name %}" class="folder-link {% if folder_data.name == current_folder %}active{% endif %}">

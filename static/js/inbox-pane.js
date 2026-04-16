@@ -126,11 +126,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const formData = new FormData(form);
     if (actionMode === 'stay') {
       formData.set('next', 'fragment');
+    } else if (actionMode === 'toggle-flag') {
+      formData.set('next', 'toggle');
     } else {
       formData.set('next', 'pane');
     }
 
-    showLoading();
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    if (actionMode !== 'toggle-flag') {
+      showLoading();
+    }
 
     fetch(form.action, {
       method: 'POST',
@@ -154,16 +163,52 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!response.ok) {
           throw new Error('Bad response: ' + response.status);
         }
+        if (actionMode === 'toggle-flag') {
+          return response.json();
+        }
         return response.text();
       })
-      .then(function (html) {
-        if (html === null) {
+      .then(function (payload) {
+        if (payload === null) {
           return;
         }
-        detailPane.innerHTML = html;
+
+        if (actionMode === 'toggle-flag') {
+          const flagged = Boolean(payload.flagged);
+          const flaggedInput = form.querySelector('input[name="flagged"]');
+          if (flaggedInput) {
+            flaggedInput.value = flagged ? '0' : '1';
+          }
+          if (submitButton) {
+            submitButton.classList.toggle('msg-action-btn--active', flagged);
+            submitButton.innerHTML = flagged ? '&#9733; Flagged' : '&#9734; Flag';
+            submitButton.title = flagged ? 'Remove flag' : 'Flag message';
+          }
+
+          // In the Starred virtual folder, unflagged messages should disappear immediately.
+          if (!flagged && window.location.pathname.indexOf('/starred/') !== -1) {
+            const selected = activeUid
+              ? listPane.querySelector('[data-uid="' + CSS.escape(String(activeUid)) + '"]')
+              : null;
+            if (selected) {
+              selected.remove();
+            }
+            activeUid = null;
+            detailPane.innerHTML = '<div class="detail-pane-empty"><p class="text-muted">Select a message to read it</p></div>';
+          }
+
+          return;
+        }
+
+        detailPane.innerHTML = payload;
       })
       .catch(function () {
         showError();
+      })
+      .finally(function () {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
       });
   }, true);
 

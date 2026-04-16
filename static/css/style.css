@@ -29,14 +29,14 @@
   --shadow-color: rgba(0, 0, 0, 0.3);
   --hover-bg: #3a3a3a;
   --active-bg: #4a6b7a;
-  --active-border: #7ab8ff;
-  --btn-primary-bg: #4a9eff;
-  --btn-primary-hover: #3a8eff;
+  --active-border: #29d9c2;
+  --btn-primary-bg: #0099cc;
+  --btn-primary-hover: #007aaa;
   --btn-secondary-bg: #404040;
   --btn-secondary-hover: #4a4a4a;
   --btn-secondary-text: #f0f0f0;
   --btn-secondary-border: #404040;
-  --accent-color: #7ab8ff;
+  --accent-color: #29d9c2;
 }
 
 /* CubelessMail - Main Stylesheet */
@@ -61,6 +61,16 @@ body {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+}
+
+/* Global link colors */
+a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 /* Layout */

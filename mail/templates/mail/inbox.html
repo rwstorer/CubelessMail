@@ -14,7 +14,7 @@
     <div class="inbox-list-pane" id="inboxListPane">
         <div class="inbox-list-header">
             <div class="inbox-list-title">
-                <h2>{{ current_folder }}</h2>
+                <h2>{% if current_folder == '__starred__' %}Starred{% else %}{{ current_folder }}{% endif %}</h2>
                 <p class="text-small text-muted">
                     {{ account.email }}
                     {% if is_search %}
@@ -46,9 +46,9 @@
         </div>
         <div class="message-list">
             {% for message in messages %}
-                <a href="{% url 'message_detail' uid=message.uid %}?folder={{ current_folder|urlencode }}"
+                <a href="{% url 'message_detail' uid=message.uid %}?folder={{ message.message_folder|default:current_folder|urlencode }}"
                    data-uid="{{ message.uid }}"
-                   data-fragment-url="{% url 'message_detail_fragment' uid=message.uid %}?folder={{ current_folder|urlencode }}"
+                   data-fragment-url="{% url 'message_detail_fragment' uid=message.uid %}?folder={{ message.message_folder|default:current_folder|urlencode }}"
                    class="message-item">
                     <div class="message-header">
                         <div class="message-sender">
@@ -70,7 +70,7 @@
                     </div>
                 </a>
             {% empty %}
-                <p class="text-center text-muted p-4">{% if is_search %}No results found.{% else %}No messages in {{ current_folder }}{% endif %}</p>
+                <p class="text-center text-muted p-4">{% if is_search %}No results found.{% elif current_folder == '__starred__' %}No starred messages.{% else %}No messages in {{ current_folder }}{% endif %}</p>
             {% endfor %}
         </div>
     </div>
