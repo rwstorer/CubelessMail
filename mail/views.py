@@ -31,6 +31,13 @@ def _is_special_folder(name):
     return False
 
 
+def _prioritize_primary_inbox(folders):
+    """Return folders with the primary INBOX entry pinned to the top."""
+    inbox_names = [f for f in folders if str(f).strip().lower() == 'inbox']
+    other_names = [f for f in folders if str(f).strip().lower() != 'inbox']
+    return inbox_names + other_names
+
+
 def _normalize_list_options(request):
     """Normalize read filter + sort options from query params."""
     read_filter = request.GET.get('read', 'all')
@@ -71,6 +78,24 @@ def _apply_list_options(messages, read_filter, sort_by):
         filtered = sorted(filtered, key=date_key, reverse=reverse)
 
     return filtered
+
+
+def _mark_cached_seen(account, folder_name, uid):
+    """Ensure the cached message flags include \\Seen after opening a message."""
+    try:
+        cached = CachedMessage.objects.get(
+            account=account,
+            folder__name=folder_name,
+            uid=str(uid),
+        )
+    except CachedMessage.DoesNotExist:
+        return
+
+    flags = list(cached.flags or [])
+    if '\\Seen' not in flags:
+        flags.append('\\Seen')
+        cached.flags = flags
+        cached.save(update_fields=['flags'])
 
 
 def inbox(request, folder_name='INBOX'):
@@ -119,6 +144,8 @@ def inbox(request, folder_name='INBOX'):
                 account=account, 
                 is_active=True
             ).values_list('name', flat=True))
+
+    folders = _prioritize_primary_inbox(folders)
     
     # Get current folder object
     try:
@@ -133,6 +160,7 @@ def inbox(request, folder_name='INBOX'):
                 port=account.imap_port
             ) as client:
                 folders = client.sync_folders_cache(account, Folder)
+                folders = _prioritize_primary_inbox(folders)
                 folder_obj = Folder.objects.get(account=account, name=current_folder, is_active=True)
         except (Folder.DoesNotExist, Exception):
             raise Http404(f"Folder '{current_folder}' not found")
@@ -302,6 +330,8 @@ def message_detail(request, uid):
                 account=account, 
                 is_active=True
             ).values_list('name', flat=True))
+
+    folders = _prioritize_primary_inbox(folders)
     
     # Fetch full message (bodies are not cached, only headers)
     message = None
@@ -317,6 +347,11 @@ def message_detail(request, uid):
                 folder=selected_folder,
                 allow_remote_images=load_remote_images,
             )
+            if message:
+                try:
+                    client.set_flag(uid, selected_folder, '\\Seen', add=True)
+                except Exception:
+                    pass
 
     except Exception as e:
         return render(request, 'mail/error.html', {
@@ -325,6 +360,8 @@ def message_detail(request, uid):
 
     if not message:
         raise Http404('Message not found')
+
+    _mark_cached_seen(account, selected_folder, uid)
 
     # Calculate unread message counts for each folder
     unread_counts = {}
@@ -386,6 +423,11 @@ def message_detail_fragment(request, uid):
                 folder=selected_folder,
                 allow_remote_images=load_remote_images,
             )
+            if message:
+                try:
+                    client.set_flag(uid, selected_folder, '\\Seen', add=True)
+                except Exception:
+                    pass
     except Exception:
         return HttpResponse(
             '<p class="text-muted p-4">Failed to load message.</p>',
@@ -400,6 +442,8 @@ def message_detail_fragment(request, uid):
             content_type='text/html',
         )
 
+    _mark_cached_seen(account, selected_folder, uid)
+
     # Build folders_with_counts for the Move dropdown in the action toolbar.
     cache_cutoff = timezone.now() - timedelta(minutes=10)
     folders = list(
@@ -411,6 +455,7 @@ def message_detail_fragment(request, uid):
     ) or list(
         Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
     )
+    folders = _prioritize_primary_inbox(folders)
     folders_with_counts = [
         {'name': f, 'unread': 0, 'is_special': _is_special_folder(f)}
         for f in folders
@@ -473,6 +518,7 @@ def starred_inbox(request):
     ) or list(
         Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
     )
+    folders = _prioritize_primary_inbox(folders)
 
     unread_counts = {}
     for folder_name in folders:
@@ -611,8 +657,8 @@ def message_mark_unread(request, uid):
         cached.save(update_fields=['flags'])
     except CachedMessage.DoesNotExist:
         pass
-    if request.POST.get('next') == 'toggle':
-        return JsonResponse({'flagged': add_flag})
+    if request.POST.get('next') == 'mark-unread':
+        return JsonResponse({'marked_unread': True})
     if request.POST.get('next') == 'fragment':
         url = reverse('message_detail_fragment', args=[uid]) + f'?folder={quote(folder, safe="")}'
         return redirect(url)

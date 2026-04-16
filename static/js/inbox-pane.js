@@ -64,6 +64,64 @@ document.addEventListener('DOMContentLoaded', function () {
   let activeUid = null;
   let activeController = null;
 
+  function getActiveRow() {
+    if (!activeUid) {
+      return null;
+    }
+    return listPane.querySelector('[data-uid="' + CSS.escape(String(activeUid)) + '"]');
+  }
+
+  function removeUnreadDot(row) {
+    if (!row) {
+      return;
+    }
+    const dot = row.querySelector('.message-unread-dot');
+    if (dot) {
+      dot.remove();
+    }
+  }
+
+  function ensureUnreadDot(row) {
+    if (!row) {
+      return;
+    }
+    const sender = row.querySelector('.message-sender');
+    if (!sender || sender.querySelector('.message-unread-dot')) {
+      return;
+    }
+    const dot = document.createElement('span');
+    dot.className = 'message-unread-dot';
+    dot.setAttribute('aria-label', 'Unread');
+    dot.setAttribute('title', 'Unread');
+    sender.insertBefore(dot, sender.firstChild);
+  }
+
+  function removeStarMarker(row) {
+    if (!row) {
+      return;
+    }
+    const star = row.querySelector('.message-starred-marker');
+    if (star) {
+      star.remove();
+    }
+  }
+
+  function ensureStarMarker(row) {
+    if (!row) {
+      return;
+    }
+    const sender = row.querySelector('.message-sender');
+    if (!sender || sender.querySelector('.message-starred-marker')) {
+      return;
+    }
+    const star = document.createElement('span');
+    star.className = 'message-starred-marker';
+    star.setAttribute('aria-label', 'Starred');
+    star.setAttribute('title', 'Starred');
+    star.innerHTML = '&#9733;';
+    sender.appendChild(star);
+  }
+
   // Intercept message row clicks on desktop/tablet
   listPane.addEventListener('click', function (event) {
     if (window.innerWidth < MOBILE_BREAKPOINT) {
@@ -126,6 +184,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const formData = new FormData(form);
     if (actionMode === 'stay') {
       formData.set('next', 'fragment');
+    } else if (actionMode === 'mark-unread') {
+      formData.set('next', 'mark-unread');
     } else if (actionMode === 'toggle-flag') {
       formData.set('next', 'toggle');
     } else {
@@ -137,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function () {
       submitButton.disabled = true;
     }
 
-    if (actionMode !== 'toggle-flag') {
+    if (actionMode !== 'toggle-flag' && actionMode !== 'mark-unread') {
       showLoading();
     }
 
@@ -163,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!response.ok) {
           throw new Error('Bad response: ' + response.status);
         }
-        if (actionMode === 'toggle-flag') {
+        if (actionMode === 'toggle-flag' || actionMode === 'mark-unread') {
           return response.json();
         }
         return response.text();
@@ -175,6 +235,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (actionMode === 'toggle-flag') {
           const flagged = Boolean(payload.flagged);
+          const activeRow = getActiveRow();
           const flaggedInput = form.querySelector('input[name="flagged"]');
           if (flaggedInput) {
             flaggedInput.value = flagged ? '0' : '1';
@@ -185,11 +246,15 @@ document.addEventListener('DOMContentLoaded', function () {
             submitButton.title = flagged ? 'Remove flag' : 'Flag message';
           }
 
+          if (flagged) {
+            ensureStarMarker(activeRow);
+          } else {
+            removeStarMarker(activeRow);
+          }
+
           // In the Starred virtual folder, unflagged messages should disappear immediately.
           if (!flagged && window.location.pathname.indexOf('/starred/') !== -1) {
-            const selected = activeUid
-              ? listPane.querySelector('[data-uid="' + CSS.escape(String(activeUid)) + '"]')
-              : null;
+            const selected = activeRow;
             if (selected) {
               selected.remove();
             }
@@ -197,6 +262,21 @@ document.addEventListener('DOMContentLoaded', function () {
             detailPane.innerHTML = '<div class="detail-pane-empty"><p class="text-muted">Select a message to read it</p></div>';
           }
 
+          return;
+        }
+
+        if (actionMode === 'mark-unread') {
+          const readFilter = document.getElementById('readFilter');
+          if (readFilter && readFilter.value === 'read') {
+            const selected = getActiveRow();
+            if (selected) {
+              selected.remove();
+            }
+            activeUid = null;
+            detailPane.innerHTML = '<div class="detail-pane-empty"><p class="text-muted">Select a message to read it</p></div>';
+          } else {
+            ensureUnreadDot(getActiveRow());
+          }
           return;
         }
 
@@ -237,6 +317,8 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(function (html) {
         detailPane.innerHTML = html;
         activeController = null;
+        // Opening a message marks it read server-side; mirror that immediately in the row indicator.
+        removeUnreadDot(getActiveRow());
       })
       .catch(function (error) {
         if (error.name === 'AbortError') {

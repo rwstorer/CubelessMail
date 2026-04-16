@@ -5,7 +5,7 @@
     <div class="msg-action-group">
 
         {# Mark unread #}
-        <form method="post" action="{% url 'message_mark_unread' uid=message.uid %}" class="js-pane-action-form" data-pane-action="stay">
+        <form method="post" action="{% url 'message_mark_unread' uid=message.uid %}" class="js-pane-action-form" data-pane-action="mark-unread">
             {% csrf_token %}
             <input type="hidden" name="folder" value="{{ current_folder }}">
             <button type="submit" class="msg-action-btn" title="Mark as unread">
