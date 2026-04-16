@@ -176,18 +176,97 @@
         }
 
         .message-list-header {
-            padding: 0.85rem 1rem;
+            padding: 0.75rem 1rem 0.5rem;
             border-bottom: 1px solid var(--border-color);
         }
 
-        .message-list-header h2 {
+        .inbox-list-title h2 {
             font-size: 1rem;
-            margin-bottom: 0.15rem;
+            margin: 0 0 0.1rem;
         }
 
-        .message-list-header p {
-            font-size: 0.84rem;
+        .inbox-list-title p {
+            margin: 0 0 0.5rem;
+            font-size: 0.875rem;
             color: var(--text-muted);
+        }
+
+        .inbox-search-form {
+            display: block;
+        }
+
+        .inbox-search-row {
+            display: flex;
+            gap: 0.3rem;
+            align-items: center;
+        }
+
+        .inbox-filter-row {
+            display: flex;
+            gap: 0.35rem;
+            align-items: center;
+            margin-top: 0.35rem;
+        }
+
+        .text-small {
+            font-size: 0.875rem;
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+        }
+
+        .inbox-search-input {
+            flex: 1;
+            min-width: 0;
+            padding: 0.35rem 0.5rem;
+            font-size: 0.85rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--surface-color);
+            color: var(--text-color);
+        }
+
+        .inbox-search-scope {
+            padding: 0.35rem 0.3rem;
+            font-size: 0.78rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--surface-color);
+            color: var(--text-color);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .inbox-search-submit {
+            padding: 0.35rem 0.55rem;
+            background: var(--accent-color);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .inbox-search-submit:hover {
+            opacity: 0.85;
+        }
+
+        .inbox-search-active {
+            margin-top: 0.45rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .inbox-search-active a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .inbox-search-active a:hover {
+            text-decoration: underline;
         }
 
         .message-list {
@@ -222,6 +301,7 @@
             align-items: center;
             gap: 0.45rem;
             font-size: 0.95rem;
+            font-weight: 400;
         }
 
         .message-unread-dot {
@@ -242,11 +322,13 @@
         .message-item-preview {
             color: var(--text-muted);
             font-size: 0.83rem;
+            font-weight: 400;
         }
 
         .message-item-subject {
             margin-bottom: 0.3rem;
             font-size: 0.92rem;
+            font-weight: 400;
         }
 
         .detail-pane {
@@ -298,9 +380,20 @@
 
         .detail-actions {
             display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.6rem;
+            margin-top: 1rem;
+        }
+
+        .detail-actions-group {
+            display: flex;
             flex-wrap: wrap;
             gap: 0.4rem;
-            margin-top: 1rem;
+        }
+
+        .detail-actions-group--right {
+            margin-left: auto;
         }
 
         .btn-icon {
@@ -335,6 +428,15 @@
                 border-right: none;
                 border-bottom: 1px solid var(--border-color);
             }
+
+            .detail-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .detail-actions-group--right {
+                margin-left: 0;
+            }
         }
     </style>
 </head>
@@ -363,7 +465,7 @@
                 </div>
                 <div class="folder-item">
                     <span>⭐ Starred</span>
-                </div>
+                    </div>
                 <div class="folder-item">
                     <span>✏️ Drafts</span>
                     <span class="folder-badge">2</span>
@@ -383,8 +485,37 @@
         <!-- Message List -->
         <div class="message-list-pane">
             <div class="message-list-header">
-                <h2>INBOX</h2>
-                <p>owner@company.com • static demo data</p>
+                <div class="inbox-list-title">
+                    <h2>INBOX</h2>
+                    <p id="messageListMeta">owner@company.com • 0 messages</p>
+                </div>
+                <form id="demoFilterForm" class="inbox-search-form" role="search">
+                    <div class="inbox-search-row">
+                        <input type="search" id="searchQuery" class="inbox-search-input" placeholder="Search…" aria-label="Search messages">
+                        <select id="searchScope" class="inbox-search-scope" aria-label="Search in">
+                            <option value="headers">Subject / From</option>
+                            <option value="text">Full text</option>
+                        </select>
+                        <button type="submit" class="inbox-search-submit" aria-label="Search">🔍</button>
+                    </div>
+                    <div class="inbox-filter-row">
+                        <label class="text-small text-muted" for="readFilter">Show</label>
+                        <select id="readFilter" class="inbox-search-scope" aria-label="Read filter">
+                            <option value="all">All</option>
+                            <option value="unread">Unread</option>
+                            <option value="read">Read</option>
+                        </select>
+
+                        <label class="text-small text-muted" for="sortBy">Sort</label>
+                        <select id="sortBy" class="inbox-search-scope" aria-label="Sort messages">
+                            <option value="date_desc">Newest</option>
+                            <option value="date_asc">Oldest</option>
+                            <option value="from_asc">From A-Z</option>
+                            <option value="from_desc">From Z-A</option>
+                        </select>
+                    </div>
+                </form>
+                <div id="searchActive" class="inbox-search-active" hidden></div>
             </div>
             <div class="message-list" id="messageList">
                 <!-- Messages populated by JS -->
@@ -394,7 +525,7 @@
         <!-- Detail Pane -->
         <div class="detail-pane" id="detailPane">
             <div class="detail-empty">
-                Select a message to read
+                Select a message to read it
             </div>
         </div>
     </div>
@@ -479,10 +610,74 @@
             }
         ];
 
+        function parseDemoDate(value) {
+            return new Date('2026 ' + value.replace(',', ''));
+        }
+
+        function getFilterState() {
+            const query = (document.getElementById('searchQuery').value || '').trim().toLowerCase();
+            const scope = document.getElementById('searchScope').value;
+            const readFilter = document.getElementById('readFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+
+            return { query, scope, readFilter, sortBy };
+        }
+
+        function getFilteredMessages() {
+            const { query, scope, readFilter, sortBy } = getFilterState();
+
+            let result = messages.slice();
+
+            if (query) {
+                result = result.filter(msg => {
+                    const headers = `${msg.subject} ${msg.sender} ${msg.from}`.toLowerCase();
+                    const fullText = `${headers} ${msg.preview} ${msg.body}`.toLowerCase();
+                    return scope === 'text' ? fullText.includes(query) : headers.includes(query);
+                });
+            }
+
+            if (readFilter === 'unread') {
+                result = result.filter(msg => msg.unread);
+            } else if (readFilter === 'read') {
+                result = result.filter(msg => !msg.unread);
+            }
+
+            if (sortBy === 'from_asc' || sortBy === 'from_desc') {
+                const dir = sortBy === 'from_desc' ? -1 : 1;
+                result.sort((a, b) => a.sender.localeCompare(b.sender) * dir);
+            } else {
+                const dir = sortBy === 'date_asc' ? 1 : -1;
+                result.sort((a, b) => (parseDemoDate(a.date) - parseDemoDate(b.date)) * dir);
+            }
+
+            return result;
+        }
+
         // Render message list
         function renderMessageList() {
             const list = document.getElementById('messageList');
-            list.innerHTML = messages.map(msg => `
+            const searchActive = document.getElementById('searchActive');
+            const { query, scope } = getFilterState();
+            const filtered = getFilteredMessages();
+            const meta = document.getElementById('messageListMeta');
+            meta.textContent = `owner@company.com • ${filtered.length} message${filtered.length === 1 ? '' : 's'}`;
+
+            if (query) {
+                const inLabel = scope === 'text' ? 'all fields' : 'subject & from';
+                searchActive.hidden = false;
+                searchActive.innerHTML = `Searching <em>${inLabel}</em> for <strong>${query}</strong> &mdash; <a href="#" onclick="clearSearchQuery(); return false;">Clear</a>`;
+            } else {
+                searchActive.hidden = true;
+                searchActive.innerHTML = '';
+            }
+
+            if (!filtered.length) {
+                const emptyText = query ? 'No results found.' : 'No messages in INBOX';
+                list.innerHTML = `<p class="text-muted" style="padding: 1rem;">${emptyText}</p>`;
+                return;
+            }
+
+            list.innerHTML = filtered.map(msg => `
                 <div class="message-item" onclick="selectMessage(${msg.id}, this)">
                     <div class="message-item-header">
                         <div class="message-item-sender">
@@ -496,6 +691,11 @@
                     <div class="message-item-preview">${msg.preview}</div>
                 </div>
             `).join('');
+        }
+
+        function clearSearchQuery() {
+            document.getElementById('searchQuery').value = '';
+            renderMessageList();
         }
 
         // Show detail pane
@@ -520,10 +720,14 @@
                 </div>
                 <div class="detail-body">${msg.body}</div>
                 <div class="detail-actions">
-                    <button class="btn-icon">↩️ Reply</button>
-                    <button class="btn-icon">↪️ Forward</button>
-                    <button class="btn-icon">${msg.flagged ? '⭐ Flagged' : '☆ Flag'}</button>
-                    <button class="btn-icon">🗑️ Delete</button>
+                    <div class="detail-actions-group">
+                        <button class="btn-icon">Mark unread</button>
+                        <button class="btn-icon">${msg.flagged ? '&#9733; Flagged' : '&#9734; Flag'}</button>
+                    </div>
+                    <div class="detail-actions-group detail-actions-group--right">
+                        <button class="btn-icon">&#128451; Archive</button>
+                        <button class="btn-icon">&#128465; Delete</button>
+                    </div>
                 </div>
             `;
 
@@ -538,6 +742,15 @@
 
         // Initial render
         renderMessageList();
+
+        const demoFilterForm = document.getElementById('demoFilterForm');
+        demoFilterForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            renderMessageList();
+        });
+
+        document.getElementById('readFilter').addEventListener('change', renderMessageList);
+        document.getElementById('sortBy').addEventListener('change', renderMessageList);
     </script>
 </body>
 </html>
