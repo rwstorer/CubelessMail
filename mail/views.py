@@ -13,6 +13,9 @@ SPECIAL_FOLDERS = {
     'deleted items', 'junk', 'junk email', 'spam', 'archive',
 }
 
+READ_FILTERS = {'all', 'unread', 'read'}
+SORT_OPTIONS = {'date_desc', 'date_asc', 'from_asc', 'from_desc'}
+
 
 def _is_special_folder(name):
     normalized = name.strip().lower()
@@ -26,6 +29,48 @@ def _is_special_folder(name):
             if suffix in SPECIAL_FOLDERS:
                 return True
     return False
+
+
+def _normalize_list_options(request):
+    """Normalize read filter + sort options from query params."""
+    read_filter = request.GET.get('read', 'all')
+    sort_by = request.GET.get('sort', 'date_desc')
+    if read_filter not in READ_FILTERS:
+        read_filter = 'all'
+    if sort_by not in SORT_OPTIONS:
+        sort_by = 'date_desc'
+    return read_filter, sort_by
+
+
+def _apply_list_options(messages, read_filter, sort_by):
+    """Apply read/unread filtering and sender/date sorting to message list."""
+    filtered = messages
+    if read_filter == 'unread':
+        filtered = [m for m in filtered if '\\Seen' not in (m.get('flags') or [])]
+    elif read_filter == 'read':
+        filtered = [m for m in filtered if '\\Seen' in (m.get('flags') or [])]
+
+    if sort_by in ('from_asc', 'from_desc'):
+        reverse = sort_by == 'from_desc'
+
+        def sender_key(message):
+            sender = (message.get('sender_name') or message.get('sender') or '').strip().lower()
+            return sender
+
+        filtered = sorted(filtered, key=sender_key, reverse=reverse)
+    else:
+        reverse = sort_by == 'date_desc'
+
+        def date_key(message):
+            # Keep missing dates stable and sorted last.
+            dt = message.get('date')
+            if dt is None:
+                return (1, 0.0)
+            return (0, dt.timestamp())
+
+        filtered = sorted(filtered, key=date_key, reverse=reverse)
+
+    return filtered
 
 
 def inbox(request, folder_name='INBOX'):
@@ -43,6 +88,7 @@ def inbox(request, folder_name='INBOX'):
     force_refresh = request.GET.get('refresh') == '1'
     search_query = request.GET.get('q', '').strip()[:200]
     search_in = request.GET.get('search_in', 'headers')
+    read_filter, sort_by = _normalize_list_options(request)
     if search_in not in ('headers', 'text'):
         search_in = 'headers'
 
@@ -174,6 +220,8 @@ def inbox(request, folder_name='INBOX'):
                     return render(request, 'mail/error.html', {
                         'error': f'Failed to fetch messages: {str(e)}'
                     })
+
+    messages = _apply_list_options(messages, read_filter, sort_by)
     
     # Calculate unread message counts for each folder
     unread_counts = {}
@@ -208,6 +256,8 @@ def inbox(request, folder_name='INBOX'):
         'search_query': search_query,
         'search_in': search_in,
         'is_search': is_search,
+        'read_filter': read_filter,
+        'sort_by': sort_by,
     }
 
     return render(request, 'mail/inbox.html', context)
@@ -388,6 +438,8 @@ def starred_inbox(request):
             'message': 'No email account configured. Please add one in the admin.'
         })
 
+    read_filter, sort_by = _normalize_list_options(request)
+
     # Collect all cached flagged messages across every folder.
     flagged_cached = CachedMessage.objects.filter(
         account=account,
@@ -408,6 +460,8 @@ def starred_inbox(request):
             'has_attachments': cached_msg.has_attachments,
             'message_folder': cached_msg.folder.name,
         })
+
+    messages = _apply_list_options(messages, read_filter, sort_by)
 
     # Folder list for sidebar.
     cache_cutoff = timezone.now() - timedelta(minutes=10)
@@ -444,6 +498,8 @@ def starred_inbox(request):
         'search_query': '',
         'search_in': 'headers',
         'is_search': False,
+        'read_filter': read_filter,
+        'sort_by': sort_by,
     })
 
 

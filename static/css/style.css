@@ -479,6 +479,13 @@ article.content.split-pane {
   align-items: center;
 }
 
+.inbox-filter-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
 .inbox-search-input {
   flex: 1;
   min-width: 0;
