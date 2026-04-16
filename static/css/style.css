@@ -351,33 +351,34 @@ textarea:focus {
 .text-muted { color: var(--text-muted); }
 .text-small { font-size: 0.875rem; }
 
-/* Split-pane inbox layout */
+/* Split-pane inbox layout — three columns (sidebar | list | detail) */
 article.content.split-pane {
   display: flex;
-  flex-direction: column;
   overflow: hidden;
   height: calc(100vh - 72px);
 }
 
 .inbox-layout {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex: 1;
-  min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
 .inbox-list-pane {
-  flex: 0 0 45%;
-  min-height: 80px;
+  flex: 0 0 350px;
+  min-width: 180px;
+  max-width: 600px;
   overflow-y: auto;
   overflow-x: hidden;
+  border-right: 1px solid var(--border-color);
 }
 
 .inbox-pane-resizer {
-  flex: 0 0 1px;
+  flex: 0 0 4px;
   background: var(--border-color);
-  cursor: ns-resize;
+  cursor: ew-resize;
   transition: background 0.15s;
 }
 
@@ -388,7 +389,7 @@ article.content.split-pane {
 
 .inbox-detail-pane {
   flex: 1;
-  min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--surface-color);
@@ -419,7 +420,9 @@ article.content.split-pane {
 
   .inbox-list-pane {
     overflow-y: visible;
-    height: auto;
+    width: 100%;
+    max-width: none;
+    border-right: none;
   }
 
   .inbox-pane-resizer {
