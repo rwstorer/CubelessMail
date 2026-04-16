@@ -47,11 +47,20 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: ...;
   color: var(--text-color);
   background-color: var(--bg-color);
   line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Layout */
@@ -100,7 +109,9 @@ header {
 
 main {
   display: flex;
-  min-height: calc(100vh - 72px);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Sidebar */
@@ -355,7 +366,6 @@ textarea:focus {
 article.content.split-pane {
   display: flex;
   overflow: hidden;
-  height: calc(100vh - 72px);
 }
 
 .inbox-layout {
