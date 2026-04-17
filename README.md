@@ -2,7 +2,7 @@
 
 ## Introduction
 
-CubelessMail is my attempt to create a Python, Django, Tailwind version of RoundCube.
+CubelessMail is my attempt to create a Python, Django, CSS3 version of RoundCube.
 
 ## Project Goals
 
