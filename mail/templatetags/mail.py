@@ -2,6 +2,27 @@ from django import template
 
 register = template.Library()
 
+_FOLDER_ICONS = {
+    'inbox': '📥',
+    'sent': '📤',
+    'drafts': '✏️',
+    'draft': '✏️',
+    'trash': '🗑️',
+    'deleted': '🗑️',
+    'junk': '🚫',
+    'spam': '🚫',
+    'archive': '📦',
+    'archives': '📦',
+    'starred': '⭐',
+    'flagged': '⭐',
+}
+
+
+@register.filter
+def folder_icon(folder_name):
+    """Return an emoji icon for well-known IMAP folder names."""
+    return _FOLDER_ICONS.get(str(folder_name).lower(), '📁')
+
 
 @register.filter
 def get_item(dictionary, key):

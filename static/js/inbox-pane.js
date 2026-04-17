@@ -1,8 +1,8 @@
 document.addEventListener('DOMContentLoaded', function () {
   const MOBILE_BREAKPOINT = 768;
-  const LIST_PANE_MIN_HEIGHT = 80;
-  const DETAIL_PANE_MIN_HEIGHT = 80;
-  const STORAGE_KEY = 'cubelessmailListPaneHeight';
+  const LIST_PANE_MIN_WIDTH = 180;
+  const DETAIL_PANE_MIN_WIDTH = 200;
+  const STORAGE_KEY = 'cubelessmailListPaneWidth';
 
   const listPane = document.getElementById('inboxListPane');
   const detailPane = document.getElementById('inboxDetailPane');
@@ -12,27 +12,27 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  // Restore saved list pane height
-  const savedHeight = localStorage.getItem(STORAGE_KEY);
-  if (savedHeight && window.innerWidth >= MOBILE_BREAKPOINT) {
-    listPane.style.flex = '0 0 ' + savedHeight + 'px';
+  // Restore saved list pane width
+  const savedWidth = localStorage.getItem(STORAGE_KEY);
+  if (savedWidth && window.innerWidth >= MOBILE_BREAKPOINT) {
+    listPane.style.flex = '0 0 ' + savedWidth + 'px';
   }
 
-  // Vertical pane resizing
+  // Horizontal pane resizing
   if (resizer) {
     let isResizing = false;
-    let startY = 0;
-    let startHeight = 0;
+    let startX = 0;
+    let startWidth = 0;
 
     resizer.addEventListener('pointerdown', function (event) {
       if (window.innerWidth < MOBILE_BREAKPOINT) {
         return;
       }
       isResizing = true;
-      startY = event.clientY;
-      startHeight = listPane.getBoundingClientRect().height;
+      startX = event.clientX;
+      startWidth = listPane.getBoundingClientRect().width;
       resizer.classList.add('resizing');
-      document.body.style.cursor = 'ns-resize';
+      document.body.style.cursor = 'ew-resize';
       document.body.style.userSelect = 'none';
       window.addEventListener('pointermove', handlePointerMove);
       window.addEventListener('pointerup', stopResizing);
@@ -40,12 +40,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function handlePointerMove(event) {
       if (!isResizing) { return; }
-      const containerHeight = listPane.parentElement.getBoundingClientRect().height;
-      const resizerHeight = resizer.getBoundingClientRect().height;
-      const maxHeight = containerHeight - resizerHeight - DETAIL_PANE_MIN_HEIGHT;
-      const delta = event.clientY - startY;
-      const newHeight = Math.min(maxHeight, Math.max(LIST_PANE_MIN_HEIGHT, startHeight + delta));
-      listPane.style.flex = '0 0 ' + newHeight + 'px';
+      const containerWidth = listPane.parentElement.getBoundingClientRect().width;
+      const resizerWidth = resizer.getBoundingClientRect().width;
+      const maxWidth = containerWidth - resizerWidth - DETAIL_PANE_MIN_WIDTH;
+      const delta = event.clientX - startX;
+      const newWidth = Math.min(maxWidth, Math.max(LIST_PANE_MIN_WIDTH, startWidth + delta));
+      listPane.style.flex = '0 0 ' + newWidth + 'px';
     }
 
     function stopResizing() {
@@ -54,8 +54,8 @@ document.addEventListener('DOMContentLoaded', function () {
       resizer.classList.remove('resizing');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      const finalHeight = listPane.getBoundingClientRect().height;
-      localStorage.setItem(STORAGE_KEY, Math.round(finalHeight));
+      const finalWidth = listPane.getBoundingClientRect().width;
+      localStorage.setItem(STORAGE_KEY, Math.round(finalWidth));
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', stopResizing);
     }
@@ -63,6 +63,64 @@ document.addEventListener('DOMContentLoaded', function () {
 
   let activeUid = null;
   let activeController = null;
+
+  function getActiveRow() {
+    if (!activeUid) {
+      return null;
+    }
+    return listPane.querySelector('[data-uid="' + CSS.escape(String(activeUid)) + '"]');
+  }
+
+  function removeUnreadDot(row) {
+    if (!row) {
+      return;
+    }
+    const dot = row.querySelector('.message-unread-dot');
+    if (dot) {
+      dot.remove();
+    }
+  }
+
+  function ensureUnreadDot(row) {
+    if (!row) {
+      return;
+    }
+    const sender = row.querySelector('.message-sender');
+    if (!sender || sender.querySelector('.message-unread-dot')) {
+      return;
+    }
+    const dot = document.createElement('span');
+    dot.className = 'message-unread-dot';
+    dot.setAttribute('aria-label', 'Unread');
+    dot.setAttribute('title', 'Unread');
+    sender.insertBefore(dot, sender.firstChild);
+  }
+
+  function removeStarMarker(row) {
+    if (!row) {
+      return;
+    }
+    const star = row.querySelector('.message-starred-marker');
+    if (star) {
+      star.remove();
+    }
+  }
+
+  function ensureStarMarker(row) {
+    if (!row) {
+      return;
+    }
+    const sender = row.querySelector('.message-sender');
+    if (!sender || sender.querySelector('.message-starred-marker')) {
+      return;
+    }
+    const star = document.createElement('span');
+    star.className = 'message-starred-marker';
+    star.setAttribute('aria-label', 'Starred');
+    star.setAttribute('title', 'Starred');
+    star.innerHTML = '&#9733;';
+    sender.appendChild(star);
+  }
 
   // Intercept message row clicks on desktop/tablet
   listPane.addEventListener('click', function (event) {
@@ -126,11 +184,22 @@ document.addEventListener('DOMContentLoaded', function () {
     const formData = new FormData(form);
     if (actionMode === 'stay') {
       formData.set('next', 'fragment');
+    } else if (actionMode === 'mark-unread') {
+      formData.set('next', 'mark-unread');
+    } else if (actionMode === 'toggle-flag') {
+      formData.set('next', 'toggle');
     } else {
       formData.set('next', 'pane');
     }
 
-    showLoading();
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    if (actionMode !== 'toggle-flag' && actionMode !== 'mark-unread') {
+      showLoading();
+    }
 
     fetch(form.action, {
       method: 'POST',
@@ -154,16 +223,72 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!response.ok) {
           throw new Error('Bad response: ' + response.status);
         }
+        if (actionMode === 'toggle-flag' || actionMode === 'mark-unread') {
+          return response.json();
+        }
         return response.text();
       })
-      .then(function (html) {
-        if (html === null) {
+      .then(function (payload) {
+        if (payload === null) {
           return;
         }
-        detailPane.innerHTML = html;
+
+        if (actionMode === 'toggle-flag') {
+          const flagged = Boolean(payload.flagged);
+          const activeRow = getActiveRow();
+          const flaggedInput = form.querySelector('input[name="flagged"]');
+          if (flaggedInput) {
+            flaggedInput.value = flagged ? '0' : '1';
+          }
+          if (submitButton) {
+            submitButton.classList.toggle('msg-action-btn--active', flagged);
+            submitButton.innerHTML = flagged ? '&#9733; Flagged' : '&#9734; Flag';
+            submitButton.title = flagged ? 'Remove flag' : 'Flag message';
+          }
+
+          if (flagged) {
+            ensureStarMarker(activeRow);
+          } else {
+            removeStarMarker(activeRow);
+          }
+
+          // In the Starred virtual folder, unflagged messages should disappear immediately.
+          if (!flagged && window.location.pathname.indexOf('/starred/') !== -1) {
+            const selected = activeRow;
+            if (selected) {
+              selected.remove();
+            }
+            activeUid = null;
+            detailPane.innerHTML = '<div class="detail-pane-empty"><p class="text-muted">Select a message to read it</p></div>';
+          }
+
+          return;
+        }
+
+        if (actionMode === 'mark-unread') {
+          const readFilter = document.getElementById('readFilter');
+          if (readFilter && readFilter.value === 'read') {
+            const selected = getActiveRow();
+            if (selected) {
+              selected.remove();
+            }
+            activeUid = null;
+            detailPane.innerHTML = '<div class="detail-pane-empty"><p class="text-muted">Select a message to read it</p></div>';
+          } else {
+            ensureUnreadDot(getActiveRow());
+          }
+          return;
+        }
+
+        detailPane.innerHTML = payload;
       })
       .catch(function () {
         showError();
+      })
+      .finally(function () {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
       });
   }, true);
 
@@ -192,6 +317,8 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(function (html) {
         detailPane.innerHTML = html;
         activeController = null;
+        // Opening a message marks it read server-side; mirror that immediately in the row indicator.
+        removeUnreadDot(getActiveRow());
       })
       .catch(function (error) {
         if (error.name === 'AbortError') {

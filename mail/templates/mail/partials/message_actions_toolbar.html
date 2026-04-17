@@ -5,7 +5,7 @@
     <div class="msg-action-group">
 
         {# Mark unread #}
-        <form method="post" action="{% url 'message_mark_unread' uid=message.uid %}" class="js-pane-action-form" data-pane-action="stay">
+        <form method="post" action="{% url 'message_mark_unread' uid=message.uid %}" class="js-pane-action-form" data-pane-action="mark-unread">
             {% csrf_token %}
             <input type="hidden" name="folder" value="{{ current_folder }}">
             <button type="submit" class="msg-action-btn" title="Mark as unread">
@@ -14,11 +14,10 @@
         </form>
 
         {# Flag / Unflag #}
-        <form method="post" action="{% url 'message_flag' uid=message.uid %}" class="js-pane-action-form" data-pane-action="stay">
+        <form method="post" action="{% url 'message_flag' uid=message.uid %}" class="js-pane-action-form" data-pane-action="toggle-flag">
             {% csrf_token %}
             <input type="hidden" name="folder" value="{{ current_folder }}">
             <input type="hidden" name="flagged" value="{% if message.flags|has_imap_flag:'Flagged' %}0{% else %}1{% endif %}">
-            <input type="hidden" name="next" value="detail">
             <button type="submit"
                     class="msg-action-btn {% if message.flags|has_imap_flag:'Flagged' %}msg-action-btn--active{% endif %}"
                     title="{% if message.flags|has_imap_flag:'Flagged' %}Remove flag{% else %}Flag message{% endif %}">

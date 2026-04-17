@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('', views.inbox, name='inbox'),
+    path('starred/', views.starred_inbox, name='starred_inbox'),
     path('folder/<path:folder_name>/', views.inbox, name='folder_inbox'),
     path('message/<int:uid>/', views.message_detail, name='message_detail'),
     path('message/<int:uid>/fragment/', views.message_detail_fragment, name='message_detail_fragment'),

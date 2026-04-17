@@ -1,5 +1,5 @@
 {% extends 'mail/base.html' %}
-{% load static %}
+{% load static mail %}
 
 {% block title %}{{ current_folder }} - CubelessMail{% endblock %}
 
@@ -14,7 +14,7 @@
     <div class="inbox-list-pane" id="inboxListPane">
         <div class="inbox-list-header">
             <div class="inbox-list-title">
-                <h2>{{ current_folder }}</h2>
+                <h2>{% if current_folder == '__starred__' %}Starred{% else %}{{ current_folder }}{% endif %}</h2>
                 <p class="text-small text-muted">
                     {{ account.email }}
                     {% if is_search %}
@@ -35,25 +35,46 @@
                     </select>
                     <button type="submit" class="inbox-search-submit" aria-label="Search">&#128269;</button>
                 </div>
+                <div class="inbox-filter-row">
+                    <label class="text-small text-muted" for="readFilter">Show</label>
+                    <select id="readFilter" name="read" class="inbox-search-scope" aria-label="Read filter">
+                        <option value="all"{% if read_filter == 'all' %} selected{% endif %}>All</option>
+                        <option value="unread"{% if read_filter == 'unread' %} selected{% endif %}>Unread</option>
+                        <option value="read"{% if read_filter == 'read' %} selected{% endif %}>Read</option>
+                    </select>
+
+                    <label class="text-small text-muted" for="sortBy">Sort</label>
+                    <select id="sortBy" name="sort" class="inbox-search-scope" aria-label="Sort messages">
+                        <option value="date_desc"{% if sort_by == 'date_desc' %} selected{% endif %}>Newest</option>
+                        <option value="date_asc"{% if sort_by == 'date_asc' %} selected{% endif %}>Oldest</option>
+                        <option value="from_asc"{% if sort_by == 'from_asc' %} selected{% endif %}>From A-Z</option>
+                        <option value="from_desc"{% if sort_by == 'from_desc' %} selected{% endif %}>From Z-A</option>
+                    </select>
+                </div>
             </form>
             {% if is_search %}
             <div class="inbox-search-active">
                 Searching <em>{% if search_in == 'text' %}all fields{% else %}subject &amp; from{% endif %}</em>
                 for <strong>{{ search_query }}</strong>
-                &mdash; <a href="{{ request.path }}">Clear</a>
+                &mdash; <a href="{{ request.path }}?read={{ read_filter|urlencode }}&sort={{ sort_by|urlencode }}">Clear</a>
             </div>
             {% endif %}
         </div>
         <div class="message-list">
             {% for message in messages %}
-                <a href="{% url 'message_detail' uid=message.uid %}?folder={{ current_folder|urlencode }}"
+                <a href="{% url 'message_detail' uid=message.uid %}?folder={{ message.message_folder|default:current_folder|urlencode }}"
                    data-uid="{{ message.uid }}"
-                   data-fragment-url="{% url 'message_detail_fragment' uid=message.uid %}?folder={{ current_folder|urlencode }}"
+                   data-fragment-url="{% url 'message_detail_fragment' uid=message.uid %}?folder={{ message.message_folder|default:current_folder|urlencode }}"
                    class="message-item">
                     <div class="message-header">
                         <div class="message-sender">
-                            <strong>{{ message.sender_name }}</strong>
-                            <span class="text-small text-muted">{{ message.sender }}</span>
+                            {% if not message.flags|has_imap_flag:'Seen' %}
+                                <span class="message-unread-dot" aria-label="Unread" title="Unread"></span>
+                            {% endif %}
+                            <span>{{ message.sender }}</span>
+                            {% if message.flags|has_imap_flag:'Flagged' %}
+                                <span class="message-starred-marker" aria-label="Starred" title="Starred">&#9733;</span>
+                            {% endif %}
                         </div>
                         <div class="message-date text-small text-muted">
                             {{ message.date }}
@@ -70,11 +91,11 @@
                     </div>
                 </a>
             {% empty %}
-                <p class="text-center text-muted p-4">{% if is_search %}No results found.{% else %}No messages in {{ current_folder }}{% endif %}</p>
+                <p class="text-center text-muted p-4">{% if is_search %}No results found.{% elif current_folder == '__starred__' %}No starred messages.{% else %}No messages in {{ current_folder }}{% endif %}</p>
             {% endfor %}
         </div>
     </div>
-    <div class="inbox-pane-resizer" id="inboxPaneResizer" aria-label="Resize panes" role="separator" aria-orientation="horizontal"></div>
+    <div class="inbox-pane-resizer" id="inboxPaneResizer" aria-label="Resize panes" role="separator" aria-orientation="vertical"></div>
     <div class="inbox-detail-pane" id="inboxDetailPane">
         <div class="detail-pane-empty">
             <p class="text-muted">Select a message to read it</p>
@@ -116,16 +137,37 @@
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    font-weight: 400;
+    color: var(--text-color);
+}
+
+.message-unread-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent-color);
+    flex: 0 0 auto;
+}
+
+.message-starred-marker {
+    color: var(--accent-color);
+    font-size: 0.85rem;
+    line-height: 1;
 }
 
 .message-date {
     white-space: nowrap;
+    font-weight: 400;
 }
 
 .message-subject {
-    font-weight: 500;
+    font-weight: 400;
     margin-bottom: 0.5rem;
     color: var(--text-color);
+}
+
+.message-preview {
+    font-weight: 400;
 }
 
 .attachment-indicator {
@@ -224,6 +266,23 @@ setInterval(checkForNewMessages, 30000);
 // Initial check after 5 seconds
 setTimeout(checkForNewMessages, 5000);
 {% endif %}
+
+// Auto-submit list controls (read filter + sort) on change.
+const inboxSearchForm = document.querySelector('.inbox-search-form');
+const readFilter = document.getElementById('readFilter');
+const sortBy = document.getElementById('sortBy');
+
+if (inboxSearchForm && readFilter) {
+    readFilter.addEventListener('change', function () {
+        inboxSearchForm.requestSubmit();
+    });
+}
+
+if (inboxSearchForm && sortBy) {
+    sortBy.addEventListener('change', function () {
+        inboxSearchForm.requestSubmit();
+    });
+}
 </script>
 
 {% endblock %}

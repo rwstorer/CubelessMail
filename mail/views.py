@@ -13,6 +13,9 @@ SPECIAL_FOLDERS = {
     'deleted items', 'junk', 'junk email', 'spam', 'archive',
 }
 
+READ_FILTERS = {'all', 'unread', 'read'}
+SORT_OPTIONS = {'date_desc', 'date_asc', 'from_asc', 'from_desc'}
+
 
 def _is_special_folder(name):
     normalized = name.strip().lower()
@@ -26,6 +29,73 @@ def _is_special_folder(name):
             if suffix in SPECIAL_FOLDERS:
                 return True
     return False
+
+
+def _prioritize_primary_inbox(folders):
+    """Return folders with the primary INBOX entry pinned to the top."""
+    inbox_names = [f for f in folders if str(f).strip().lower() == 'inbox']
+    other_names = [f for f in folders if str(f).strip().lower() != 'inbox']
+    return inbox_names + other_names
+
+
+def _normalize_list_options(request):
+    """Normalize read filter + sort options from query params."""
+    read_filter = request.GET.get('read', 'all')
+    sort_by = request.GET.get('sort', 'date_desc')
+    if read_filter not in READ_FILTERS:
+        read_filter = 'all'
+    if sort_by not in SORT_OPTIONS:
+        sort_by = 'date_desc'
+    return read_filter, sort_by
+
+
+def _apply_list_options(messages, read_filter, sort_by):
+    """Apply read/unread filtering and sender/date sorting to message list."""
+    filtered = messages
+    if read_filter == 'unread':
+        filtered = [m for m in filtered if '\\Seen' not in (m.get('flags') or [])]
+    elif read_filter == 'read':
+        filtered = [m for m in filtered if '\\Seen' in (m.get('flags') or [])]
+
+    if sort_by in ('from_asc', 'from_desc'):
+        reverse = sort_by == 'from_desc'
+
+        def sender_key(message):
+            sender = (message.get('sender_name') or message.get('sender') or '').strip().lower()
+            return sender
+
+        filtered = sorted(filtered, key=sender_key, reverse=reverse)
+    else:
+        reverse = sort_by == 'date_desc'
+
+        def date_key(message):
+            # Keep missing dates stable and sorted last.
+            dt = message.get('date')
+            if dt is None:
+                return (1, 0.0)
+            return (0, dt.timestamp())
+
+        filtered = sorted(filtered, key=date_key, reverse=reverse)
+
+    return filtered
+
+
+def _mark_cached_seen(account, folder_name, uid):
+    """Ensure the cached message flags include \\Seen after opening a message."""
+    try:
+        cached = CachedMessage.objects.get(
+            account=account,
+            folder__name=folder_name,
+            uid=str(uid),
+        )
+    except CachedMessage.DoesNotExist:
+        return
+
+    flags = list(cached.flags or [])
+    if '\\Seen' not in flags:
+        flags.append('\\Seen')
+        cached.flags = flags
+        cached.save(update_fields=['flags'])
 
 
 def inbox(request, folder_name='INBOX'):
@@ -43,6 +113,7 @@ def inbox(request, folder_name='INBOX'):
     force_refresh = request.GET.get('refresh') == '1'
     search_query = request.GET.get('q', '').strip()[:200]
     search_in = request.GET.get('search_in', 'headers')
+    read_filter, sort_by = _normalize_list_options(request)
     if search_in not in ('headers', 'text'):
         search_in = 'headers'
 
@@ -73,6 +144,8 @@ def inbox(request, folder_name='INBOX'):
                 account=account, 
                 is_active=True
             ).values_list('name', flat=True))
+
+    folders = _prioritize_primary_inbox(folders)
     
     # Get current folder object
     try:
@@ -87,6 +160,7 @@ def inbox(request, folder_name='INBOX'):
                 port=account.imap_port
             ) as client:
                 folders = client.sync_folders_cache(account, Folder)
+                folders = _prioritize_primary_inbox(folders)
                 folder_obj = Folder.objects.get(account=account, name=current_folder, is_active=True)
         except (Folder.DoesNotExist, Exception):
             raise Http404(f"Folder '{current_folder}' not found")
@@ -174,6 +248,8 @@ def inbox(request, folder_name='INBOX'):
                     return render(request, 'mail/error.html', {
                         'error': f'Failed to fetch messages: {str(e)}'
                     })
+
+    messages = _apply_list_options(messages, read_filter, sort_by)
     
     # Calculate unread message counts for each folder
     unread_counts = {}
@@ -208,6 +284,8 @@ def inbox(request, folder_name='INBOX'):
         'search_query': search_query,
         'search_in': search_in,
         'is_search': is_search,
+        'read_filter': read_filter,
+        'sort_by': sort_by,
     }
 
     return render(request, 'mail/inbox.html', context)
@@ -252,6 +330,8 @@ def message_detail(request, uid):
                 account=account, 
                 is_active=True
             ).values_list('name', flat=True))
+
+    folders = _prioritize_primary_inbox(folders)
     
     # Fetch full message (bodies are not cached, only headers)
     message = None
@@ -267,6 +347,11 @@ def message_detail(request, uid):
                 folder=selected_folder,
                 allow_remote_images=load_remote_images,
             )
+            if message:
+                try:
+                    client.set_flag(uid, selected_folder, '\\Seen', add=True)
+                except Exception:
+                    pass
 
     except Exception as e:
         return render(request, 'mail/error.html', {
@@ -275,6 +360,8 @@ def message_detail(request, uid):
 
     if not message:
         raise Http404('Message not found')
+
+    _mark_cached_seen(account, selected_folder, uid)
 
     # Calculate unread message counts for each folder
     unread_counts = {}
@@ -336,6 +423,11 @@ def message_detail_fragment(request, uid):
                 folder=selected_folder,
                 allow_remote_images=load_remote_images,
             )
+            if message:
+                try:
+                    client.set_flag(uid, selected_folder, '\\Seen', add=True)
+                except Exception:
+                    pass
     except Exception:
         return HttpResponse(
             '<p class="text-muted p-4">Failed to load message.</p>',
@@ -350,6 +442,8 @@ def message_detail_fragment(request, uid):
             content_type='text/html',
         )
 
+    _mark_cached_seen(account, selected_folder, uid)
+
     # Build folders_with_counts for the Move dropdown in the action toolbar.
     cache_cutoff = timezone.now() - timedelta(minutes=10)
     folders = list(
@@ -361,6 +455,7 @@ def message_detail_fragment(request, uid):
     ) or list(
         Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
     )
+    folders = _prioritize_primary_inbox(folders)
     folders_with_counts = [
         {'name': f, 'unread': 0, 'is_special': _is_special_folder(f)}
         for f in folders
@@ -375,6 +470,83 @@ def message_detail_fragment(request, uid):
 
 
 from django.http import JsonResponse
+
+
+VIRTUAL_STARRED = '__starred__'
+
+
+def starred_inbox(request):
+    """Virtual folder showing all flagged/starred messages across all folders."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return render(request, 'mail/no_account.html', {
+            'message': 'No email account configured. Please add one in the admin.'
+        })
+
+    read_filter, sort_by = _normalize_list_options(request)
+
+    # Collect all cached flagged messages across every folder.
+    flagged_cached = CachedMessage.objects.filter(
+        account=account,
+    ).select_related('folder').order_by('-date')[:200]
+
+    messages = []
+    for cached_msg in flagged_cached:
+        if '\\Flagged' not in cached_msg.flags:
+            continue
+        messages.append({
+            'uid': cached_msg.uid,
+            'subject': cached_msg.subject,
+            'sender': cached_msg.sender,
+            'sender_name': cached_msg.sender_name,
+            'date': cached_msg.date,
+            'flags': cached_msg.flags,
+            'size': cached_msg.size,
+            'has_attachments': cached_msg.has_attachments,
+            'message_folder': cached_msg.folder.name,
+        })
+
+    messages = _apply_list_options(messages, read_filter, sort_by)
+
+    # Folder list for sidebar.
+    cache_cutoff = timezone.now() - timedelta(minutes=10)
+    cached_folders = Folder.objects.filter(
+        account=account, last_updated__gte=cache_cutoff, is_active=True
+    )
+    folders = list(
+        cached_folders.values_list('name', flat=True)
+    ) or list(
+        Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
+    )
+    folders = _prioritize_primary_inbox(folders)
+
+    unread_counts = {}
+    for folder_name in folders:
+        try:
+            folder_obj = Folder.objects.get(account=account, name=folder_name, is_active=True)
+            cached = CachedMessage.objects.filter(account=account, folder=folder_obj)
+            unread_counts[folder_name] = sum(1 for m in cached if '\\Seen' not in m.flags)
+        except Folder.DoesNotExist:
+            unread_counts[folder_name] = 0
+
+    folders_with_counts = [
+        {'name': f, 'unread': unread_counts.get(f, 0), 'is_special': _is_special_folder(f)}
+        for f in folders
+    ]
+
+    return render(request, 'mail/inbox.html', {
+        'account': account,
+        'folders': folders,
+        'folders_with_counts': folders_with_counts,
+        'messages': messages,
+        'current_folder': VIRTUAL_STARRED,
+        'unread_counts': unread_counts,
+        'search_query': '',
+        'search_in': 'headers',
+        'is_search': False,
+        'read_filter': read_filter,
+        'sort_by': sort_by,
+    })
 
 
 def _folder_redirect(folder_name):
@@ -485,6 +657,8 @@ def message_mark_unread(request, uid):
         cached.save(update_fields=['flags'])
     except CachedMessage.DoesNotExist:
         pass
+    if request.POST.get('next') == 'mark-unread':
+        return JsonResponse({'marked_unread': True})
     if request.POST.get('next') == 'fragment':
         url = reverse('message_detail_fragment', args=[uid]) + f'?folder={quote(folder, safe="")}'
         return redirect(url)
@@ -519,6 +693,8 @@ def message_flag(request, uid):
         cached.save(update_fields=['flags'])
     except CachedMessage.DoesNotExist:
         pass
+    if request.POST.get('next') == 'toggle':
+        return JsonResponse({'flagged': add_flag})
     if request.POST.get('next') == 'fragment':
         url = reverse('message_detail_fragment', args=[uid]) + f'?folder={quote(folder, safe="")}'
         return redirect(url)
