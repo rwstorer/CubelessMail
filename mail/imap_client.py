@@ -9,6 +9,8 @@ from email.policy import default
 from urllib.parse import quote, urlparse
 import re
 
+from django.utils import timezone
+
 import nh3
 
 
@@ -47,6 +49,14 @@ class IMAPEmailClient:
             return True
         except Exception as e:
             raise ConnectionError(f"Failed to connect to {self.host}: {str(e)}")
+
+    def _normalize_envelope_date(self, date_value):
+        """Return a timezone-aware datetime suitable for Django DateTimeField storage."""
+        if date_value is None:
+            return None
+        if timezone.is_naive(date_value):
+            return timezone.make_aware(date_value, timezone.get_default_timezone())
+        return date_value
 
     def disconnect(self):
         """Close IMAP connection."""
@@ -188,7 +198,7 @@ class IMAPEmailClient:
                     )
                     sender = str(envelope.from_[0]) if envelope.from_ else ''
                     sender_name = self._extract_sender_name(sender)
-                    date = envelope.date
+                    date = self._normalize_envelope_date(envelope.date)
                     size = msg_data.get(b'RFC822.SIZE', 0)
                     bodystructure = msg_data.get(b'BODYSTRUCTURE')
                     has_attachments = self._has_attachments_from_bodystructure(bodystructure)
@@ -721,7 +731,7 @@ class IMAPEmailClient:
                         subject = envelope.subject.decode('utf-8', errors='ignore') if envelope.subject else ''
                         sender = str(envelope.from_[0]) if envelope.from_ else ''
                         sender_name = self._extract_sender_name(sender)
-                        date = envelope.date
+                        date = self._normalize_envelope_date(envelope.date)
                         size = msg_data.get(b'RFC822.SIZE', 0)
                         bodystructure = msg_data.get(b'BODYSTRUCTURE')
                         has_attachments = self._has_attachments_from_bodystructure(bodystructure)
