@@ -70,6 +70,11 @@ After configuring environment variables, initialize the database:
 python manage.py migrate
 ```
 
+This command will:
+- Create the SQLite database file (`db.sqlite3`) if it doesn't exist
+- Set up all required tables and schemas
+- No additional database server setup needed
+
 ### Creating a Superuser
 
 ```bash
