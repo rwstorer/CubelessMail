@@ -3,6 +3,7 @@ from django.views.decorators.http import require_GET, require_POST
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
 from urllib.parse import quote
 from datetime import timedelta
 from .models import EmailAccount, Folder, CachedMessage
@@ -98,6 +99,7 @@ def _mark_cached_seen(account, folder_name, uid):
         cached.save(update_fields=['flags'])
 
 
+@login_required
 def inbox(request, folder_name='INBOX'):
     """Display inbox with folders and messages."""
     
@@ -291,6 +293,7 @@ def inbox(request, folder_name='INBOX'):
     return render(request, 'mail/inbox.html', context)
 
 
+@login_required
 def message_detail(request, uid):
     """Display the selected email message."""
     account = EmailAccount.objects.first()
@@ -397,6 +400,7 @@ def message_detail(request, uid):
     })
 
 
+@login_required
 @require_GET
 def message_detail_fragment(request, uid):
     """Returns message detail as an HTML fragment for the inbox split pane."""
@@ -475,6 +479,7 @@ from django.http import JsonResponse
 VIRTUAL_STARRED = '__starred__'
 
 
+@login_required
 def starred_inbox(request):
     """Virtual folder showing all flagged/starred messages across all folders."""
     account = EmailAccount.objects.first()
@@ -556,6 +561,7 @@ def _folder_redirect(folder_name):
     return redirect('folder_inbox', folder_name=folder_name)
 
 
+@login_required
 @require_POST
 def message_delete(request, uid):
     """Move message to Trash (or expunge if already in Trash)."""
@@ -579,6 +585,7 @@ def message_delete(request, uid):
     return _folder_redirect(folder)
 
 
+@login_required
 @require_POST
 def message_archive(request, uid):
     """Move message to Archive folder."""
@@ -604,6 +611,7 @@ def message_archive(request, uid):
     return _folder_redirect(folder)
 
 
+@login_required
 @require_POST
 def message_move(request, uid):
     """Move message to a different folder."""
@@ -632,6 +640,7 @@ def message_move(request, uid):
     return _folder_redirect(folder)
 
 
+@login_required
 @require_POST
 def message_mark_unread(request, uid):
     """Remove the \\Seen flag from a message."""
@@ -665,6 +674,7 @@ def message_mark_unread(request, uid):
     return _folder_redirect(folder)
 
 
+@login_required
 @require_POST
 def message_flag(request, uid):
     """Toggle the \\Flagged flag on a message."""
@@ -704,6 +714,7 @@ def message_flag(request, uid):
     return _folder_redirect(folder)
 
 
+@login_required
 @require_POST
 def create_folder(request):
     """Create a new IMAP folder."""
@@ -727,6 +738,7 @@ def create_folder(request):
     return redirect('folder_inbox', folder_name=folder_name)
 
 
+@login_required
 @require_POST
 def delete_folder(request):
     """Delete an IMAP folder."""
@@ -750,6 +762,7 @@ def delete_folder(request):
     return redirect('inbox')
 
 
+@login_required
 @require_GET
 def check_new_messages(request):
     """AJAX endpoint to check for new messages in current folder."""
@@ -787,6 +800,7 @@ def check_new_messages(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
 def inline_image(request, uid, part_index):
     """Serve inline CID image bytes for a specific message MIME part."""
     account = EmailAccount.objects.first()
@@ -839,6 +853,7 @@ def inline_image(request, uid, part_index):
         raise Http404(f'Failed to load inline image: {str(e)}')
 
 
+@login_required
 def download_attachment(request, uid, part_index):
     """Serve non-inline attachment bytes for download."""
     account = EmailAccount.objects.first()
