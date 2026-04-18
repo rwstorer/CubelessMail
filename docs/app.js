@@ -132,7 +132,30 @@ function renderMessageList() {
     if (query) {
         const inLabel = scope === 'text' ? 'all fields' : 'subject & from';
         searchActive.hidden = false;
-        searchActive.innerHTML = `Searching <em>${inLabel}</em> for <strong>${query}</strong> &mdash; <a href="#" onclick="clearSearchQuery(); return false;">Clear</a>`;
+        searchActive.innerHTML = '';
+
+        searchActive.appendChild(document.createTextNode('Searching '));
+
+        const em = document.createElement('em');
+        em.textContent = inLabel;
+        searchActive.appendChild(em);
+
+        searchActive.appendChild(document.createTextNode(' for '));
+
+        const strong = document.createElement('strong');
+        strong.textContent = query;
+        searchActive.appendChild(strong);
+
+        searchActive.appendChild(document.createTextNode(' — '));
+
+        const clearLink = document.createElement('a');
+        clearLink.href = '#';
+        clearLink.textContent = 'Clear';
+        clearLink.addEventListener('click', function (event) {
+            event.preventDefault();
+            clearSearchQuery();
+        });
+        searchActive.appendChild(clearLink);
     } else {
         searchActive.hidden = true;
         searchActive.innerHTML = '';
