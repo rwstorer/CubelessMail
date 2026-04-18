@@ -85,6 +85,13 @@ The following environment variables **must** be configured in your `.env` file:
 - `CSRF_TRUSTED_ORIGINS` - Comma-separated HTTPS origins for deployments behind domain/proxy.
 - `TRUST_PROXY_SSL_HEADER` - Set `True` only behind a trusted reverse proxy that sets `X-Forwarded-Proto`.
 - `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS` - Optional overrides.
+- `AXES_ENABLED` - Enables login lockout protection (default: `False` local, `True` production).
+- `AXES_FAILURE_LIMIT` - Number of failed login attempts allowed before lockout (default: `5`).
+- `AXES_COOLOFF_MINUTES` - Lockout cooldown in minutes (default: `30`).
+- `AXES_RESET_ON_SUCCESS` - Reset failure counter after successful login (default: `True`).
+- `ADMIN_IP_ALLOWLIST_ENABLED` - Restrict `/admin/` to trusted IPs/CIDRs (default: `False` local, `True` production).
+- `ADMIN_IP_ALLOWLIST` - Comma-separated IPs/CIDRs allowed to access `/admin/`.
+- `ADMIN_IP_ALLOWLIST_TRUST_X_FORWARDED_FOR` - Set `True` only when a trusted proxy sets `X-Forwarded-For` correctly.
 
 ### Local-Safe vs Production-Safe Defaults
 
@@ -129,3 +136,5 @@ Visit `http://localhost:8000` in your browser.
 - The encryption key is stored in the environment (`MAIL_ENCRYPTION_KEY`) and never committed to version control
 - All endpoints require authentication
 - Django's CSRF protection is enabled
+- Login brute-force protection is available through django-axes (enabled by default in production)
+- Admin access can be restricted to trusted IP ranges through an environment-driven allowlist

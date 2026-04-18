@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 
@@ -42,6 +43,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 DJANGO_ENV = os.getenv('DJANGO_ENV', 'local').strip().lower()
 IS_PRODUCTION = DJANGO_ENV == 'production'
+AXES_ENABLED = _env_bool('AXES_ENABLED', default=IS_PRODUCTION)
+ADMIN_IP_ALLOWLIST_ENABLED = _env_bool('ADMIN_IP_ALLOWLIST_ENABLED', default=IS_PRODUCTION)
+ADMIN_IP_ALLOWLIST = _env_list('ADMIN_IP_ALLOWLIST', default=[])
+ADMIN_IP_ALLOWLIST_TRUST_X_FORWARDED_FOR = _env_bool(
+    'ADMIN_IP_ALLOWLIST_TRUST_X_FORWARDED_FOR',
+    default=False,
+)
+
+if ADMIN_IP_ALLOWLIST_ENABLED and not ADMIN_IP_ALLOWLIST:
+    raise ValueError(
+        'ADMIN_IP_ALLOWLIST_ENABLED is true but ADMIN_IP_ALLOWLIST is not set.'
+    )
 
 # SECURITY WARNING: keep the secret key used in production secret!
 LOCAL_DEV_SECRET_KEY = 'django-insecure-local-dev-key-change-me'
@@ -80,6 +93,9 @@ INSTALLED_APPS = [
     'mail',
 ]
 
+if AXES_ENABLED:
+    INSTALLED_APPS.append('axes')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -90,6 +106,18 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+if ADMIN_IP_ALLOWLIST_ENABLED:
+    security_middleware = 'django.middleware.security.SecurityMiddleware'
+    allowlist_middleware = 'cubelessmail.middleware.AdminIPAllowlistMiddleware'
+    security_index = MIDDLEWARE.index(security_middleware)
+    MIDDLEWARE.insert(security_index + 1, allowlist_middleware)
+
+if AXES_ENABLED:
+    auth_middleware = 'django.contrib.auth.middleware.AuthenticationMiddleware'
+    axes_middleware = 'axes.middleware.AxesMiddleware'
+    auth_index = MIDDLEWARE.index(auth_middleware)
+    MIDDLEWARE.insert(auth_index + 1, axes_middleware)
 
 ROOT_URLCONF = 'cubelessmail.urls'
 
@@ -139,6 +167,17 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+if AXES_ENABLED:
+    AUTHENTICATION_BACKENDS.insert(0, 'axes.backends.AxesStandaloneBackend')
+
+AXES_FAILURE_LIMIT = int(os.getenv('AXES_FAILURE_LIMIT', '5'))
+AXES_COOLOFF_TIME = timedelta(minutes=int(os.getenv('AXES_COOLOFF_MINUTES', '30')))
+AXES_RESET_ON_SUCCESS = _env_bool('AXES_RESET_ON_SUCCESS', default=True)
 
 
 # Internationalization
