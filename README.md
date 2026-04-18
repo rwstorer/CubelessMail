@@ -46,20 +46,20 @@ git clone <repository-url>
 cd CubelessMail
 ```
 
-2. Create and activate a virtual environment:
+1. Create and activate a virtual environment:
 
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\Activate.ps1
 ```
 
-3. Install dependencies:
+1. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Create a `.env` file in the project root directory with the required environment variables:
+1. Create a `.env` file in the project root directory with the required environment variables:
 
 ```bash
 cp .env.example .env
@@ -85,6 +85,10 @@ The following environment variables **must** be configured in your `.env` file:
 - `CSRF_TRUSTED_ORIGINS` - Comma-separated HTTPS origins for deployments behind domain/proxy.
 - `TRUST_PROXY_SSL_HEADER` - Set `True` only behind a trusted reverse proxy that sets `X-Forwarded-Proto`.
 - `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS` - Optional overrides.
+- `SESSION_COOKIE_SAMESITE`, `CSRF_COOKIE_SAMESITE` - Cookie cross-site policy (default: `Lax`).
+- `SECURE_REFERRER_POLICY` - Referrer leakage policy (default: `strict-origin-when-cross-origin`).
+- `SECURE_CROSS_ORIGIN_OPENER_POLICY` - Cross-origin opener isolation policy (default: `same-origin`).
+- `X_FRAME_OPTIONS` - Clickjacking protection header (default: `DENY`).
 - `AXES_ENABLED` - Enables login lockout protection (default: `False` local, `True` production).
 - `AXES_FAILURE_LIMIT` - Number of failed login attempts allowed before lockout (default: `5`).
 - `AXES_COOLOFF_MINUTES` - Lockout cooldown in minutes (default: `30`).
