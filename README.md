@@ -71,6 +71,9 @@ The following environment variables **must** be configured in your `.env` file:
 
 #### Required for Production
 
+- **`DJANGO_ENV`** - Set to `production` for deployed environments. Use `local` for development.
+- **`DJANGO_SECRET_KEY`** - Strong Django secret key, unique per environment.
+- **`ALLOWED_HOSTS`** - Comma-separated public hostnames (for example: `mail.example.com,www.mail.example.com`).
 - **`MAIL_ENCRYPTION_KEY`** - Encryption key for storing IMAP credentials securely.
   - Generate a new key: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
   - Store the output in your `.env` file
@@ -78,9 +81,19 @@ The following environment variables **must** be configured in your `.env` file:
 
 #### Optional
 
-- `DEBUG` - Set to `False` in production (default: `True`)
-- `SECRET_KEY` - Django secret key (change in production)
-- `ALLOWED_HOSTS` - Comma-separated list of allowed hosts
+- `DEBUG` - Explicit override. Defaults to `True` in local mode and `False` in production mode.
+- `CSRF_TRUSTED_ORIGINS` - Comma-separated HTTPS origins for deployments behind domain/proxy.
+- `TRUST_PROXY_SSL_HEADER` - Set `True` only behind a trusted reverse proxy that sets `X-Forwarded-Proto`.
+- `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS` - Optional overrides.
+
+### Local-Safe vs Production-Safe Defaults
+
+CubelessMail now uses environment-aware security defaults:
+
+- Local (`DJANGO_ENV=local`): avoids breaking local HTTP development (`runserver` works on `http://127.0.0.1:8000`).
+- Production (`DJANGO_ENV=production`): enables secure-cookie and HTTPS-oriented settings by default.
+
+This means you can use one `settings.py` for both local and deployed environments without manual edits.
 
 ### Database Migrations
 

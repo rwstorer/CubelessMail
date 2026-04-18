@@ -14,6 +14,22 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+
+def _env_bool(name, default=False):
+    """Parse a boolean environment variable with a safe fallback."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _env_list(name, default=None):
+    """Parse a comma-separated environment variable into a list of strings."""
+    value = os.getenv(name, '')
+    if not value.strip():
+        return default or []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
 # Load environment variables from .env file
 load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 
@@ -24,13 +40,32 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
+DJANGO_ENV = os.getenv('DJANGO_ENV', 'local').strip().lower()
+IS_PRODUCTION = DJANGO_ENV == 'production'
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-1!+h*buxljqmv!xnjjvde4=p0uqogzsqvtt3ht!sjag75yj6nv'
+LOCAL_DEV_SECRET_KEY = 'django-insecure-local-dev-key-change-me'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', LOCAL_DEV_SECRET_KEY)
+if IS_PRODUCTION and (
+    not SECRET_KEY
+    or SECRET_KEY == LOCAL_DEV_SECRET_KEY
+    or SECRET_KEY.startswith('django-insecure-')
+):
+    raise ValueError(
+        'Production requires a strong DJANGO_SECRET_KEY set via environment variable.'
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool('DEBUG', default=not IS_PRODUCTION)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = _env_list(
+    'ALLOWED_HOSTS',
+    default=['localhost', '127.0.0.1'] if not IS_PRODUCTION else [],
+)
+if IS_PRODUCTION and not ALLOWED_HOSTS:
+    raise ValueError('Production requires ALLOWED_HOSTS to be set.')
+
+CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS', default=[])
 
 
 # Application definition
@@ -130,6 +165,26 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+# Environment-aware security settings:
+# - Local defaults avoid breaking HTTP development.
+# - Production defaults enforce HTTPS and secure cookies.
+SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', default=IS_PRODUCTION)
+CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', default=IS_PRODUCTION)
+SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', default=IS_PRODUCTION)
+
+SECURE_HSTS_SECONDS = int(
+    os.getenv('SECURE_HSTS_SECONDS', '31536000' if IS_PRODUCTION else '0')
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
+    'SECURE_HSTS_INCLUDE_SUBDOMAINS',
+    default=IS_PRODUCTION,
+)
+SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', default=False)
+SECURE_CONTENT_TYPE_NOSNIFF = _env_bool('SECURE_CONTENT_TYPE_NOSNIFF', default=True)
+
+if _env_bool('TRUST_PROXY_SSL_HEADER', default=False):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Email credential encryption
 # Generate a key with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
