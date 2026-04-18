@@ -6,8 +6,12 @@ from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from urllib.parse import quote
 from datetime import timedelta
+import logging
 from .models import EmailAccount, Folder, CachedMessage
 from .imap_client import IMAPEmailClient
+
+
+logger = logging.getLogger(__name__)
 
 SPECIAL_FOLDERS = {
     'inbox', 'sent', 'sent items', 'sent mail', 'drafts', 'trash',
@@ -99,6 +103,13 @@ def _mark_cached_seen(account, folder_name, uid):
         cached.save(update_fields=['flags'])
 
 
+def _render_user_error(request, user_message, *, log_message=None):
+    """Render a generic, user-safe error message and log internal details."""
+    if log_message:
+        logger.exception(log_message)
+    return render(request, 'mail/error.html', {'error': user_message})
+
+
 @login_required
 def inbox(request, folder_name='INBOX'):
     """Display inbox with folders and messages."""
@@ -179,10 +190,12 @@ def inbox(request, folder_name='INBOX'):
                 port=account.imap_port,
             ) as client:
                 messages = client.search_messages(current_folder, search_query, search_in)
-        except Exception as e:
-            return render(request, 'mail/error.html', {
-                'error': f'Search failed: {str(e)}'
-            })
+        except Exception:
+            return _render_user_error(
+                request,
+                'Search failed. Please try again in a moment.',
+                log_message='IMAP search failed.',
+            )
     else:
         # Try to get cached messages first (5 minute cache for message headers)
         msg_cache_cutoff = timezone.now() - timedelta(minutes=5)
@@ -246,10 +259,12 @@ def inbox(request, folder_name='INBOX'):
                         port=account.imap_port
                     ) as client:
                         messages = client.fetch_emails(current_folder, limit=50)
-                except Exception as e:
-                    return render(request, 'mail/error.html', {
-                        'error': f'Failed to fetch messages: {str(e)}'
-                    })
+                except Exception:
+                    return _render_user_error(
+                        request,
+                        'Failed to fetch messages. Please try again later.',
+                        log_message='Failed to fetch messages from IMAP after cache fallback.',
+                    )
 
     messages = _apply_list_options(messages, read_filter, sort_by)
     
@@ -356,10 +371,12 @@ def message_detail(request, uid):
                 except Exception:
                     pass
 
-    except Exception as e:
-        return render(request, 'mail/error.html', {
-            'error': f'Failed to load message: {str(e)}'
-        })
+    except Exception:
+        return _render_user_error(
+            request,
+            'Failed to load message. Please try again.',
+            log_message='Failed to load message detail from IMAP.',
+        )
 
     if not message:
         raise Http404('Message not found')
@@ -796,8 +813,9 @@ def check_new_messages(request):
             'has_new': actual_count > cached_count
         })
         
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    except Exception:
+        logger.exception('Failed to check new messages for folder: %s', folder_name)
+        return JsonResponse({'error': 'Unable to check for new messages right now.'}, status=500)
 
 
 @login_required
@@ -849,8 +867,9 @@ def inline_image(request, uid, part_index):
 
     except Http404:
         raise
-    except Exception as e:
-        raise Http404(f'Failed to load inline image: {str(e)}')
+    except Exception:
+        logger.exception('Failed to load inline image. uid=%s, folder=%s, part_index=%s', uid, selected_folder, part_index)
+        raise Http404('Inline image is unavailable')
 
 
 @login_required
@@ -908,5 +927,6 @@ def download_attachment(request, uid, part_index):
 
     except Http404:
         raise
-    except Exception as e:
-        raise Http404(f'Failed to load attachment: {str(e)}')
+    except Exception:
+        logger.exception('Failed to load attachment. uid=%s, folder=%s, part_index=%s', uid, selected_folder, part_index)
+        raise Http404('Attachment is unavailable')

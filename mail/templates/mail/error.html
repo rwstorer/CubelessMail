@@ -11,6 +11,6 @@
 {% block content %}
 <div class="p-4">
     <h2 style="color: #d32f2f;">Error</h2>
-    <p>{{ error }}</p>
+    <p>{{ error|default:'Something went wrong. Please try again.' }}</p>
 </div>
 {% endblock %}
