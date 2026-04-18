@@ -9,9 +9,7 @@ class EmailAccount(models.Model):
     imap_host = models.CharField(max_length=255)
     imap_port = models.IntegerField(default=993)
     imap_username = models.CharField(max_length=255)
-    # Deprecated: kept for backward compatibility during migration
-    imap_password = models.CharField(max_length=255, blank=True, default='')
-    # New encrypted field
+    # Encrypted credential storage.
     imap_password_encrypted = models.TextField(blank=True, default='')
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -28,23 +26,19 @@ class EmailAccount(models.Model):
     def imap_password_decrypted(self):
         """
         Get the IMAP password, decrypted.
-        Falls back to plaintext field for backward compatibility.
         """
         if self.imap_password_encrypted:
             return decrypt_value(self.imap_password_encrypted)
-        return self.imap_password
+        return ''
     
     def set_imap_password(self, plaintext):
         """
         Set the IMAP password (encrypted).
-        Clears the old plaintext field.
         """
         if plaintext:
             self.imap_password_encrypted = encrypt_value(plaintext)
-            self.imap_password = ''  # Clear old plaintext
         else:
             self.imap_password_encrypted = ''
-            self.imap_password = ''
 
 
 class Folder(models.Model):

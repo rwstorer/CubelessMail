@@ -18,9 +18,9 @@ def encrypt_passwords(apps, schema_editor):
                 account.imap_password_encrypted = encrypt_value(account.imap_password)
                 account.imap_password = ''  # Clear plaintext
                 account.save(update_fields=['imap_password', 'imap_password_encrypted'])
-            except Exception as e:
+            except Exception:
                 # Log error but don't fail migration
-                print(f"Failed to encrypt password for {account.email}: {str(e)}")
+                print(f"Failed to encrypt password for {account.email}")
 
 
 def decrypt_passwords(apps, schema_editor):
