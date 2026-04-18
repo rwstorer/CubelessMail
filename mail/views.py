@@ -136,7 +136,7 @@ def inbox(request, folder_name='INBOX'):
             with IMAPEmailClient(
                 account.imap_host,
                 account.imap_username,
-                account.imap_password,
+                account.imap_password_decrypted,
                 port=account.imap_port
             ) as client:
                 folders = client.sync_folders_cache(account, Folder)
@@ -158,7 +158,7 @@ def inbox(request, folder_name='INBOX'):
             with IMAPEmailClient(
                 account.imap_host,
                 account.imap_username,
-                account.imap_password,
+                account.imap_password_decrypted,
                 port=account.imap_port
             ) as client:
                 folders = client.sync_folders_cache(account, Folder)
@@ -175,7 +175,7 @@ def inbox(request, folder_name='INBOX'):
             with IMAPEmailClient(
                 account.imap_host,
                 account.imap_username,
-                account.imap_password,
+                account.imap_password_decrypted,
                 port=account.imap_port,
             ) as client:
                 messages = client.search_messages(current_folder, search_query, search_in)
@@ -212,7 +212,7 @@ def inbox(request, folder_name='INBOX'):
                 with IMAPEmailClient(
                     account.imap_host,
                     account.imap_username,
-                    account.imap_password,
+                    account.imap_password_decrypted,
                     port=account.imap_port
                 ) as client:
                     # Sync message cache
@@ -242,7 +242,7 @@ def inbox(request, folder_name='INBOX'):
                     with IMAPEmailClient(
                         account.imap_host,
                         account.imap_username,
-                        account.imap_password,
+                        account.imap_password_decrypted,
                         port=account.imap_port
                     ) as client:
                         messages = client.fetch_emails(current_folder, limit=50)
@@ -323,7 +323,7 @@ def message_detail(request, uid):
             with IMAPEmailClient(
                 account.imap_host,
                 account.imap_username,
-                account.imap_password,
+                account.imap_password_decrypted,
                 port=account.imap_port
             ) as client:
                 folders = client.sync_folders_cache(account, Folder)
@@ -342,7 +342,7 @@ def message_detail(request, uid):
         with IMAPEmailClient(
             account.imap_host,
             account.imap_username,
-            account.imap_password,
+            account.imap_password_decrypted,
             port=account.imap_port
         ) as client:
             message = client.fetch_email_by_uid(
@@ -419,7 +419,7 @@ def message_detail_fragment(request, uid):
         with IMAPEmailClient(
             account.imap_host,
             account.imap_username,
-            account.imap_password,
+            account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             message = client.fetch_email_by_uid(
@@ -571,7 +571,7 @@ def message_delete(request, uid):
     folder = request.POST.get('folder', 'INBOX').strip()
     try:
         with IMAPEmailClient(
-            account.imap_host, account.imap_username, account.imap_password,
+            account.imap_host, account.imap_username, account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             client.delete_message(uid, folder)
@@ -595,7 +595,7 @@ def message_archive(request, uid):
     folder = request.POST.get('folder', 'INBOX').strip()
     try:
         with IMAPEmailClient(
-            account.imap_host, account.imap_username, account.imap_password,
+            account.imap_host, account.imap_username, account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             client.archive_message(uid, folder)
@@ -626,7 +626,7 @@ def message_move(request, uid):
         return _folder_redirect(folder)
     try:
         with IMAPEmailClient(
-            account.imap_host, account.imap_username, account.imap_password,
+            account.imap_host, account.imap_username, account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             client.move_message(uid, folder, to_folder)
@@ -650,7 +650,7 @@ def message_mark_unread(request, uid):
     folder = request.POST.get('folder', 'INBOX').strip()
     try:
         with IMAPEmailClient(
-            account.imap_host, account.imap_username, account.imap_password,
+            account.imap_host, account.imap_username, account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             client.set_flag(uid, folder, '\\Seen', add=False)
@@ -685,7 +685,7 @@ def message_flag(request, uid):
     add_flag = request.POST.get('flagged') == '1'
     try:
         with IMAPEmailClient(
-            account.imap_host, account.imap_username, account.imap_password,
+            account.imap_host, account.imap_username, account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             client.set_flag(uid, folder, '\\Flagged', add=add_flag)
@@ -728,7 +728,7 @@ def create_folder(request):
         with IMAPEmailClient(
             account.imap_host,
             account.imap_username,
-            account.imap_password,
+            account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             client.create_folder(folder_name)
@@ -752,7 +752,7 @@ def delete_folder(request):
         with IMAPEmailClient(
             account.imap_host,
             account.imap_username,
-            account.imap_password,
+            account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             client.delete_folder(folder_name)
@@ -784,7 +784,7 @@ def check_new_messages(request):
         with IMAPEmailClient(
             account.imap_host,
             account.imap_username,
-            account.imap_password,
+            account.imap_password_decrypted,
             port=account.imap_port
         ) as client:
             client.client.select_folder(folder_name)
@@ -813,7 +813,7 @@ def inline_image(request, uid, part_index):
         with IMAPEmailClient(
             account.imap_host,
             account.imap_username,
-            account.imap_password,
+            account.imap_password_decrypted,
             port=account.imap_port
         ) as client:
             client.client.select_folder(selected_folder)
@@ -866,7 +866,7 @@ def download_attachment(request, uid, part_index):
         with IMAPEmailClient(
             account.imap_host,
             account.imap_username,
-            account.imap_password,
+            account.imap_password_decrypted,
             port=account.imap_port
         ) as client:
             client.client.select_folder(selected_folder)
