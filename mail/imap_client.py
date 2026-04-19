@@ -142,37 +142,37 @@ class IMAPEmailClient:
         self.client.select_folder(from_folder)
         self.client.move([uid], to_folder)
 
-        def append_to_sent(self, raw_message_bytes):
-            """Append a copy of a sent message to the server's Sent folder."""
-            if not self.client:
-                raise RuntimeError("Not connected. Call connect() first.")
+    def append_to_sent(self, raw_message_bytes):
+        """Append a copy of a sent message to the server's Sent folder."""
+        if not self.client:
+            raise RuntimeError("Not connected. Call connect() first.")
 
-            sent_folder = None
+        sent_folder = None
+        try:
+            sent_folder = self.client.find_special_folder(b'\\Sent')
+        except Exception:
+            pass
+
+        if sent_folder is None:
+            available = {f[2] for f in self.client.list_folders()}
+            for candidate in ('Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent', 'INBOX/Sent'):
+                if candidate in available:
+                    sent_folder = candidate
+                    break
+
+        if sent_folder is None:
             try:
-                sent_folder = self.client.find_special_folder(b'\\Sent')
-            except Exception:
-                pass
-
-            if sent_folder is None:
-                available = {f[2] for f in self.client.list_folders()}
-                for candidate in ('Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent', 'INBOX/Sent'):
-                    if candidate in available:
-                        sent_folder = candidate
-                        break
-
-            if sent_folder is None:
-                try:
-                    self.client.create_folder('Sent')
-                    sent_folder = 'Sent'
-                except Exception as e:
-                    logger.error(f"Failed to create Sent folder: {str(e)}")
-                    raise RuntimeError("Could not find or create a Sent folder.")
-
-            try:
-                self.client.append(sent_folder, raw_message_bytes, flags=[b'\\Seen'])
+                self.client.create_folder('Sent')
+                sent_folder = 'Sent'
             except Exception as e:
-                logger.error(f"Failed to append message to Sent folder '{sent_folder}': {str(e)}")
-                raise RuntimeError("Failed to save message to Sent folder.")
+                logger.error(f"Failed to create Sent folder: {str(e)}")
+                raise RuntimeError("Could not find or create a Sent folder.")
+
+        try:
+            self.client.append(sent_folder, raw_message_bytes, flags=[b'\\Seen'])
+        except Exception as e:
+            logger.error(f"Failed to append message to Sent folder '{sent_folder}': {str(e)}")
+            raise RuntimeError("Failed to save message to Sent folder.")
 
     def set_flag(self, uid, folder, flag, add=True):
         """Add or remove an IMAP flag on a message."""
