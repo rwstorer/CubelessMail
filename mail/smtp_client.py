@@ -8,6 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from email.utils import formatdate
 import os
 import logging
 
@@ -147,7 +148,8 @@ class SMTPEmailClient:
             if references:
                 msg['References'] = references
             msg['Subject'] = subject
-            
+            msg['Date'] = formatdate(localtime=True)
+
             # Attach bodies
             if html_body:
                 # Attach plain text first, then HTML (per RFC 2046)
