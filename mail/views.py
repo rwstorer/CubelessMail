@@ -236,23 +236,35 @@ def _build_compose_context(request, account):
     }
 
 
-def _get_sidebar_folder_rows(account):
-    """Return folder rows used by sidebar templates."""
+def _get_merged_cached_folder_names(account):
+    """Return folder names with fresh cache first, then any stale active folders."""
     cache_cutoff = timezone.now() - timedelta(minutes=10)
-    cached_folders = Folder.objects.filter(
-        account=account,
-        last_updated__gte=cache_cutoff,
-        is_active=True,
+    fresh_folders = list(
+        Folder.objects.filter(
+            account=account,
+            last_updated__gte=cache_cutoff,
+            is_active=True,
+        ).values_list('name', flat=True)
+    )
+    all_active_folders = list(
+        Folder.objects.filter(
+            account=account,
+            is_active=True,
+        ).values_list('name', flat=True)
     )
 
-    if cached_folders.exists():
-        folders = list(cached_folders.values_list('name', flat=True))
+    if fresh_folders:
+        seen = set(fresh_folders)
+        merged = fresh_folders + [name for name in all_active_folders if name not in seen]
     else:
-        folders = list(
-            Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
-        )
+        merged = all_active_folders
 
-    folders = _prioritize_primary_inbox(folders)
+    return _prioritize_primary_inbox(merged)
+
+
+def _get_sidebar_folder_rows(account):
+    """Return folder rows used by sidebar templates."""
+    folders = _get_merged_cached_folder_names(account)
 
     unread_counts = {}
     for folder_name in folders:
@@ -465,18 +477,8 @@ def inbox(request, folder_name='INBOX'):
     if search_in not in ('headers', 'text'):
         search_in = 'headers'
 
-    # Try to get cached folders first (10 minute cache)
-    cache_cutoff = timezone.now() - timedelta(minutes=10)
-    cached_folders = Folder.objects.filter(
-        account=account,
-        last_updated__gte=cache_cutoff,
-        is_active=True
-    )
-    
-    if cached_folders.exists():
-        # Use cached folders
-        folders = list(cached_folders.values_list('name', flat=True))
-    else:
+    folders = _get_merged_cached_folder_names(account)
+    if not folders:
         # Cache miss - fetch from server and update cache
         try:
             with IMAPEmailClient(
@@ -485,15 +487,9 @@ def inbox(request, folder_name='INBOX'):
                 account.imap_password_decrypted,
                 port=account.imap_port
             ) as client:
-                folders = client.sync_folders_cache(account, Folder)
-        except Exception as e:
-            # Fallback to stale cache if server is down
-            folders = list(Folder.objects.filter(
-                account=account, 
-                is_active=True
-            ).values_list('name', flat=True))
-
-    folders = _prioritize_primary_inbox(folders)
+                folders = _prioritize_primary_inbox(client.sync_folders_cache(account, Folder))
+        except Exception:
+            folders = []
     
     # Get current folder object
     try:
@@ -656,19 +652,8 @@ def message_detail(request, uid):
     selected_folder = request.GET.get('folder', 'INBOX')
     load_remote_images = request.GET.get('load_remote') == '1'
     
-    # Try to get cached folders first (10 minute cache)
-    cache_cutoff = timezone.now() - timedelta(minutes=10)
-    cached_folders = Folder.objects.filter(
-        account=account,
-        last_updated__gte=cache_cutoff,
-        is_active=True
-    )
-    
-    if cached_folders.exists():
-        # Use cached folders
-        folders = list(cached_folders.values_list('name', flat=True))
-    else:
-        # Cache miss - fetch from server and update cache
+    folders = _get_merged_cached_folder_names(account)
+    if not folders:
         try:
             with IMAPEmailClient(
                 account.imap_host,
@@ -676,15 +661,9 @@ def message_detail(request, uid):
                 account.imap_password_decrypted,
                 port=account.imap_port
             ) as client:
-                folders = client.sync_folders_cache(account, Folder)
-        except Exception as e:
-            # Fallback to stale cache if server is down
-            folders = list(Folder.objects.filter(
-                account=account, 
-                is_active=True
-            ).values_list('name', flat=True))
-
-    folders = _prioritize_primary_inbox(folders)
+                folders = _prioritize_primary_inbox(client.sync_folders_cache(account, Folder))
+        except Exception:
+            folders = []
     
     # Fetch full message (bodies are not cached, only headers)
     message = None
@@ -807,16 +786,7 @@ def message_detail_fragment(request, uid):
     _mark_cached_seen(account, selected_folder, uid)
 
     # Build folders_with_counts for the Move dropdown in the action toolbar.
-    cache_cutoff = timezone.now() - timedelta(minutes=10)
-    folders = list(
-        Folder.objects.filter(
-            account=account,
-            last_updated__gte=cache_cutoff,
-            is_active=True,
-        ).values_list('name', flat=True)
-    ) or list(
-        Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
-    )
+    folders = _get_merged_cached_folder_names(account)
     folders = _prioritize_primary_inbox(folders)
     folders_with_counts = [
         {'name': f, 'unread': 0, 'is_special': _is_special_folder(f)}
@@ -874,16 +844,7 @@ def starred_inbox(request):
     messages = _apply_list_options(messages, read_filter, sort_by)
 
     # Folder list for sidebar.
-    cache_cutoff = timezone.now() - timedelta(minutes=10)
-    cached_folders = Folder.objects.filter(
-        account=account, last_updated__gte=cache_cutoff, is_active=True
-    )
-    folders = list(
-        cached_folders.values_list('name', flat=True)
-    ) or list(
-        Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
-    )
-    folders = _prioritize_primary_inbox(folders)
+    folders = _get_merged_cached_folder_names(account)
 
     unread_counts = {}
     for folder_name in folders:
@@ -929,17 +890,38 @@ def message_delete(request, uid):
     if not account:
         return redirect('inbox')
     folder = request.POST.get('folder', 'INBOX').strip()
+
+    def _resolve_folder_obj(folder_name):
+        try:
+            return Folder.objects.get(account=account, name=folder_name, is_active=True)
+        except Folder.DoesNotExist:
+            return Folder.objects.filter(
+                account=account,
+                name__iexact=folder_name,
+                is_active=True,
+            ).first()
+
     try:
         with IMAPEmailClient(
             account.imap_host, account.imap_username, account.imap_password_decrypted,
             port=account.imap_port,
         ) as client:
             client.delete_message(uid, folder)
+            folder_obj = _resolve_folder_obj(folder)
+            if folder_obj is not None:
+                # Re-sync current folder so UI list reflects the server immediately.
+                client.sync_messages_cache(account, folder_obj, CachedMessage, limit=50)
     except Exception:
         pass
-    CachedMessage.objects.filter(
-        account=account, folder__name=folder, uid=str(uid)
-    ).delete()
+    folder_obj = _resolve_folder_obj(folder)
+    if folder_obj is not None:
+        CachedMessage.objects.filter(
+            account=account, folder=folder_obj, uid=str(uid)
+        ).delete()
+    else:
+        CachedMessage.objects.filter(
+            account=account, folder__name=folder, uid=str(uid)
+        ).delete()
     if request.POST.get('next') == 'pane':
         return HttpResponse(status=204)
     return _folder_redirect(folder)
@@ -1323,14 +1305,16 @@ def send_message_api(request):
                 port=account.imap_port,
             ) as imap:
                 sent_folder_name = imap.append_to_sent(raw_sent_bytes)
-            # Invalidate the Sent folder's message cache so the next inbox
-            # view re-fetches from IMAP and shows the newly appended message.
-            if sent_folder_name:
-                try:
-                    sent_folder_obj = Folder.objects.get(account=account, name=sent_folder_name)
+                # Keep Sent folder cache fresh so the just-appended message
+                # appears immediately in this app's Sent view.
+                if sent_folder_name:
+                    sent_folder_obj, _ = Folder.objects.update_or_create(
+                        account=account,
+                        name=sent_folder_name,
+                        defaults={'is_active': True},
+                    )
                     CachedMessage.objects.filter(account=account, folder=sent_folder_obj).delete()
-                except Folder.DoesNotExist:
-                    pass
+                    imap.sync_messages_cache(account, sent_folder_obj, CachedMessage, limit=50)
         except Exception:
             logger.warning('Failed to save sent message to Sent folder.', exc_info=True)
 

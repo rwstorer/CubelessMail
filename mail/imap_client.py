@@ -83,7 +83,13 @@ class IMAPEmailClient:
 
         try:
             folders = self.client.list_folders()
-            return [folder[2] for folder in folders]
+            names = []
+            for folder in folders:
+                name = folder[2]
+                if isinstance(name, bytes):
+                    name = name.decode('utf-8', errors='ignore')
+                names.append(name)
+            return names
         except Exception as e:
             logger.error(f"Failed to list folders: {str(e)}")
             raise RuntimeError("Failed to list folders.")
@@ -147,6 +153,11 @@ class IMAPEmailClient:
         if not self.client:
             raise RuntimeError("Not connected. Call connect() first.")
 
+        def _folder_name(value):
+            if isinstance(value, bytes):
+                return value.decode('utf-8', errors='ignore')
+            return str(value)
+
         sent_folder = None
         try:
             sent_folder = self.client.find_special_folder(b'\\Sent')
@@ -154,7 +165,7 @@ class IMAPEmailClient:
             pass
 
         if sent_folder is None:
-            available = {f[2] for f in self.client.list_folders()}
+            available = {_folder_name(f[2]) for f in self.client.list_folders()}
             for candidate in ('Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent', 'INBOX/Sent'):
                 if candidate in available:
                     sent_folder = candidate
@@ -167,6 +178,8 @@ class IMAPEmailClient:
             except Exception as e:
                 logger.error(f"Failed to create Sent folder: {str(e)}")
                 raise RuntimeError("Could not find or create a Sent folder.")
+
+        sent_folder = _folder_name(sent_folder)
 
         logger.info(f"Appending sent message to IMAP folder: {sent_folder!r}")
         try:

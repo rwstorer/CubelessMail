@@ -270,3 +270,19 @@ COMPOSE_MAX_TOTAL_ATTACHMENT_SIZE = _env_int(
     default=25 * 1024 * 1024,
     minimum=1,
 )
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'mail': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+    },
+}
