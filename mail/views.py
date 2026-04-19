@@ -1119,8 +1119,6 @@ def delete_folder(request):
     return redirect('inbox')
 
 
-@login_required
-@require_GET
 _NO_NEW_MESSAGE_FOLDERS = frozenset({
     'sent', 'sent items', 'sent messages',
     'drafts', 'draft',
@@ -1130,6 +1128,8 @@ _NO_NEW_MESSAGE_FOLDERS = frozenset({
 })
 
 
+@login_required
+@require_GET
 def check_new_messages(request):
     """AJAX endpoint to check for new messages in current folder."""
     account = EmailAccount.objects.first()
