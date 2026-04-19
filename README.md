@@ -96,6 +96,11 @@ The following environment variables **must** be configured in your `.env` file:
 - `ADMIN_IP_ALLOWLIST_ENABLED` - Restrict `/admin/` to trusted IPs/CIDRs (default: `False` local, `True` production).
 - `ADMIN_IP_ALLOWLIST` - Comma-separated IPs/CIDRs allowed to access `/admin/`.
 - `ADMIN_IP_ALLOWLIST_TRUST_X_FORWARDED_FOR` - Set `True` only when a trusted proxy sets `X-Forwarded-For` correctly.
+- `COMPOSE_MAX_RECIPIENTS` - Maximum combined To/CC/BCC recipients per send request (default: `50`).
+- `COMPOSE_MAX_SUBJECT_LEN` - Maximum subject length (default: `255`).
+- `COMPOSE_MAX_BODY_LEN` - Maximum text or HTML body length (default: `200000`).
+- `COMPOSE_MAX_ATTACHMENT_SIZE` - Max bytes per attachment (default: `10485760`, 10MB).
+- `COMPOSE_MAX_TOTAL_ATTACHMENT_SIZE` - Max total bytes across attachments (default: `26214400`, 25MB).
 
 ### Local-Safe vs Production-Safe Defaults
 

@@ -11,22 +11,34 @@ class EmailAccountAdminForm(forms.ModelForm):
         widget=forms.PasswordInput(),
         help_text='Enter the password. Leave blank to keep the existing password.'
     )
+    smtp_password = forms.CharField(
+        label='SMTP Password',
+        required=False,
+        widget=forms.PasswordInput(),
+        help_text='Enter the password. Leave blank to keep the existing password.'
+    )
 
     class Meta:
         model = EmailAccount
-        fields = ('email', 'imap_host', 'imap_port', 'imap_username', 'imap_password')
+        fields = (
+            'email',
+            'imap_host', 'imap_port', 'imap_username', 'imap_password',
+            'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password',
+        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Don't require password on update
+        # Don't require passwords on update
         if self.instance.pk:
             self.fields['imap_password'].required = False
+            self.fields['smtp_password'].required = False
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        # If a new password was entered, encrypt and set it
         if self.cleaned_data.get('imap_password'):
             instance.set_imap_password(self.cleaned_data['imap_password'])
+        if self.cleaned_data.get('smtp_password'):
+            instance.set_smtp_password(self.cleaned_data['smtp_password'])
         if commit:
             instance.save()
         return instance
@@ -43,6 +55,9 @@ class EmailAccountAdmin(admin.ModelAdmin):
         }),
         ('IMAP Configuration', {
             'fields': ('imap_host', 'imap_port', 'imap_username', 'imap_password')
+        }),
+        ('SMTP Configuration', {
+            'fields': ('smtp_host', 'smtp_port', 'smtp_username', 'smtp_password')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),

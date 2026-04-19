@@ -158,6 +158,14 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
+    // Cancel button for the compose pane.
+    if (event.target.closest('.js-compose-cancel')) {
+      event.preventDefault();
+      activeUid = null;
+      detailPane.innerHTML = '<div class="detail-pane-empty"><p class="text-muted">Select a message to read it</p></div>';
+      return;
+    }
+
     const link = event.target.closest('[data-fragment-url]');
     if (!link) {
       return;
@@ -168,9 +176,16 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // Intercept compose trigger links on desktop and load into the detail pane.
+  // Only match interactive elements (a, button) — not form containers that carry the
+  // attribute only to expose the URL for post-send "compose another" wiring.
   document.addEventListener('click', function (event) {
     const composeTrigger = event.target.closest('[data-compose-fragment-url]');
     if (!composeTrigger) {
+      return;
+    }
+
+    const tag = composeTrigger.tagName;
+    if (tag !== 'A' && tag !== 'BUTTON') {
       return;
     }
 

@@ -31,6 +31,22 @@ def _env_list(name, default=None):
         return default or []
     return [item.strip() for item in value.split(',') if item.strip()]
 
+
+def _env_int(name, default, minimum=None):
+    """Parse an integer environment variable with optional minimum guard."""
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        value = default
+    else:
+        try:
+            value = int(raw_value)
+        except ValueError:
+            value = default
+
+    if minimum is not None:
+        value = max(minimum, value)
+    return value
+
 # Load environment variables from .env file
 load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 
@@ -239,3 +255,18 @@ if _env_bool('TRUST_PROXY_SSL_HEADER', default=False):
 # Email credential encryption
 # Generate a key with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 MAIL_ENCRYPTION_KEY = os.getenv('MAIL_ENCRYPTION_KEY', '')
+
+# Compose/send limits (env-overridable)
+COMPOSE_MAX_RECIPIENTS = _env_int('COMPOSE_MAX_RECIPIENTS', default=50, minimum=1)
+COMPOSE_MAX_SUBJECT_LEN = _env_int('COMPOSE_MAX_SUBJECT_LEN', default=255, minimum=1)
+COMPOSE_MAX_BODY_LEN = _env_int('COMPOSE_MAX_BODY_LEN', default=200_000, minimum=1)
+COMPOSE_MAX_ATTACHMENT_SIZE = _env_int(
+    'COMPOSE_MAX_ATTACHMENT_SIZE',
+    default=10 * 1024 * 1024,
+    minimum=1,
+)
+COMPOSE_MAX_TOTAL_ATTACHMENT_SIZE = _env_int(
+    'COMPOSE_MAX_TOTAL_ATTACHMENT_SIZE',
+    default=25 * 1024 * 1024,
+    minimum=1,
+)

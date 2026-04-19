@@ -60,6 +60,8 @@
                 <button type="submit" class="btn btn-primary">Send</button>
                 {% if mobile_fallback %}
                     <a href="{% url 'inbox' %}" class="btn btn-secondary">Cancel</a>
+                {% else %}
+                    <button type="button" class="btn btn-secondary js-compose-cancel">Cancel</button>
                 {% endif %}
             </div>
         </form>

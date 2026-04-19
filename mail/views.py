@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 from email.utils import parseaddr
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.http import Http404, HttpResponse, JsonResponse
@@ -28,11 +29,11 @@ SPECIAL_FOLDERS = {
 
 READ_FILTERS = {'all', 'unread', 'read'}
 SORT_OPTIONS = {'date_desc', 'date_asc', 'from_asc', 'from_desc'}
-MAX_RECIPIENTS = 50
-MAX_SUBJECT_LEN = 255
-MAX_BODY_LEN = 200_000
-MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
-MAX_TOTAL_ATTACHMENT_SIZE = 25 * 1024 * 1024
+MAX_RECIPIENTS = settings.COMPOSE_MAX_RECIPIENTS
+MAX_SUBJECT_LEN = settings.COMPOSE_MAX_SUBJECT_LEN
+MAX_BODY_LEN = settings.COMPOSE_MAX_BODY_LEN
+MAX_ATTACHMENT_SIZE = settings.COMPOSE_MAX_ATTACHMENT_SIZE
+MAX_TOTAL_ATTACHMENT_SIZE = settings.COMPOSE_MAX_TOTAL_ATTACHMENT_SIZE
 
 
 def _parse_recipient_values(raw_value):
