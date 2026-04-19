@@ -1121,13 +1121,31 @@ def delete_folder(request):
 
 @login_required
 @require_GET
+_NO_NEW_MESSAGE_FOLDERS = frozenset({
+    'sent', 'sent items', 'sent messages',
+    'drafts', 'draft',
+    'trash', 'deleted items', 'deleted messages',
+    'junk', 'junk email', 'spam',
+    'archive', 'archives',
+})
+
+
 def check_new_messages(request):
     """AJAX endpoint to check for new messages in current folder."""
     account = EmailAccount.objects.first()
     if not account:
         return JsonResponse({'error': 'No account configured'}, status=400)
-    
+
     folder_name = request.GET.get('folder', 'INBOX')
+
+    # Never report "new messages" for outgoing or system folders — a count
+    # increase there (e.g. a self-filed Sent copy) is not incoming mail.
+    folder_base = folder_name.lower()
+    for sep in ('.', '/'):
+        if sep in folder_base:
+            folder_base = folder_base.rsplit(sep, 1)[-1]
+    if folder_base in _NO_NEW_MESSAGE_FOLDERS:
+        return JsonResponse({'cached_count': 0, 'actual_count': 0, 'has_new': False})
     
     try:
         # Get current cached message count
