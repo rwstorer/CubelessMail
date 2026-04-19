@@ -17,6 +17,7 @@ CubelessMail is my attempt to use AI to create a Python, Django, CSS3 version of
   - STARTTLS
 - CALDAV calendar (unlikely)
 - Contact management (eventually)
+- Django PAM modules e.g. django_pam for local auth (eventually)
 
 ## Next Up TODO
 
@@ -24,11 +25,11 @@ CubelessMail is my attempt to use AI to create a Python, Django, CSS3 version of
   - Sub-folders
   - expand and collapse
 - Compose
-  - Create new messages
-  - Reply
-  - Reply All
-  - Forward
-  - Use an HTML editor (Quill ? ) for composition
+  - Create new messages (done)
+  - Reply (done)
+  - Reply All (working)
+  - Forward (done)
+  - Use an HTML editor for composition (used Quill. Done.)
 
 ## Setup & Configuration
 
