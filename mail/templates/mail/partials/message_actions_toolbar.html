@@ -4,6 +4,26 @@
     {# ── Left group: non-destructive ─────────────────────────────── #}
     <div class="msg-action-group">
 
+        {# Reply #}
+        <a
+            href="{{ reply_page_url }}"
+            data-compose-fragment-url="{{ reply_fragment_url }}"
+            class="msg-action-btn"
+            title="Reply"
+        >
+            Reply
+        </a>
+
+        {# Forward #}
+        <a
+            href="{{ forward_page_url }}"
+            data-compose-fragment-url="{{ forward_fragment_url }}"
+            class="msg-action-btn"
+            title="Forward"
+        >
+            Forward
+        </a>
+
         {# Mark unread #}
         <form method="post" action="{% url 'message_mark_unread' uid=message.uid %}" class="js-pane-action-form" data-pane-action="mark-unread">
             {% csrf_token %}

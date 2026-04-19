@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+from email.utils import parseaddr
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.http import Http404, HttpResponse, JsonResponse
@@ -9,7 +10,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from datetime import timedelta
 import logging
 import nh3
@@ -272,6 +273,84 @@ def _get_sidebar_folder_rows(account):
     ]
 
     return folders_with_counts, unread_counts
+
+
+def _prefix_subject(subject, prefix):
+    """Return subject with prefix unless already present."""
+    base = (subject or '').strip()
+    if not base:
+        return prefix
+
+    lowered = base.lower()
+    if lowered.startswith('re:') or lowered.startswith('fwd:') or lowered.startswith('fw:'):
+        return base
+    return f'{prefix} {base}'
+
+
+def _quote_plain_body(text):
+    """Return text quoted with leading > markers for replies/forwards."""
+    lines = (text or '').splitlines()
+    if not lines:
+        return ''
+    quoted_lines = [f'> {line}' if line else '>' for line in lines]
+    return '\n'.join(quoted_lines)
+
+
+def _build_compose_action_urls(message):
+    """Return reply/forward URLs for compose fragment + page fallback."""
+    sender_display = (message.get('sender') or '').strip()
+    reply_to_header = ''
+    raw_message = message.get('raw')
+    if raw_message is not None:
+        reply_to_header = (raw_message.get('Reply-To') or '').strip()
+
+    reply_to_address = parseaddr(reply_to_header)[1] if reply_to_header else parseaddr(sender_display)[1]
+
+    message_id = ''
+    references = ''
+    if raw_message is not None:
+        message_id = (raw_message.get('Message-ID') or '').strip()
+        references = (raw_message.get('References') or '').strip()
+
+    sender_name = sender_display or 'Unknown sender'
+    sent_date = message.get('date')
+    sent_label = str(sent_date) if sent_date else 'Unknown date'
+    subject = (message.get('subject') or '').strip()
+    text_body = (message.get('body') or '').strip()
+    limited_body = text_body[:4000]
+
+    reply_intro = f'\n\nOn {sent_label}, {sender_name} wrote:\n'
+    reply_text = (reply_intro + _quote_plain_body(limited_body)).strip()
+
+    forward_header = (
+        '\n\n---------- Forwarded message ---------\n'
+        f'From: {sender_name}\n'
+        f'Date: {sent_label}\n'
+        f'Subject: {subject}\n\n'
+    )
+    forward_text = (forward_header + limited_body).strip()
+
+    reply_params = {
+        'to': reply_to_address,
+        'subject': _prefix_subject(subject, 'Re:'),
+        'text_body': reply_text,
+        'in_reply_to': message_id,
+        'references': ' '.join([v for v in [references, message_id] if v]).strip(),
+    }
+    forward_params = {
+        'subject': _prefix_subject(subject, 'Fwd:'),
+        'text_body': forward_text,
+    }
+
+    reply_query = urlencode({k: v for k, v in reply_params.items() if v})
+    forward_query = urlencode({k: v for k, v in forward_params.items() if v})
+
+    return {
+        'reply_fragment_url': f"{reverse('compose_fragment')}?{reply_query}" if reply_query else reverse('compose_fragment'),
+        'reply_page_url': f"{reverse('compose_page')}?{reply_query}" if reply_query else reverse('compose_page'),
+        'forward_fragment_url': f"{reverse('compose_fragment')}?{forward_query}" if forward_query else reverse('compose_fragment'),
+        'forward_page_url': f"{reverse('compose_page')}?{forward_query}" if forward_query else reverse('compose_page'),
+    }
 
 
 def _is_special_folder(name):
@@ -658,6 +737,8 @@ def message_detail(request, uid):
         for f in folders
     ]
     
+    compose_actions = _build_compose_action_urls(message)
+
     return render(request, 'mail/message_detail.html', {
         'account': account,
         'message': message,
@@ -666,6 +747,10 @@ def message_detail(request, uid):
         'folders': folders,
         'folders_with_counts': folders_with_counts,
         'unread_counts': unread_counts,
+        'reply_fragment_url': compose_actions['reply_fragment_url'],
+        'reply_page_url': compose_actions['reply_page_url'],
+        'forward_fragment_url': compose_actions['forward_fragment_url'],
+        'forward_page_url': compose_actions['forward_page_url'],
     })
 
 
@@ -734,11 +819,17 @@ def message_detail_fragment(request, uid):
         for f in folders
     ]
 
+    compose_actions = _build_compose_action_urls(message)
+
     return render(request, 'mail/partials/message_detail_body.html', {
         'message': message,
         'current_folder': selected_folder,
         'load_remote_images': load_remote_images,
         'folders_with_counts': folders_with_counts,
+        'reply_fragment_url': compose_actions['reply_fragment_url'],
+        'reply_page_url': compose_actions['reply_page_url'],
+        'forward_fragment_url': compose_actions['forward_fragment_url'],
+        'forward_page_url': compose_actions['forward_page_url'],
     })
 
 VIRTUAL_STARRED = '__starred__'
