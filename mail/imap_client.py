@@ -142,7 +142,7 @@ class IMAPEmailClient:
         self.client.select_folder(from_folder)
         self.client.move([uid], to_folder)
 
-    def append_to_sent(self, raw_message_bytes):
+    def append_to_sent(self, raw_message):
         """Append a copy of a sent message to the server's Sent folder."""
         if not self.client:
             raise RuntimeError("Not connected. Call connect() first.")
@@ -170,7 +170,7 @@ class IMAPEmailClient:
 
         logger.info(f"Appending sent message to IMAP folder: {sent_folder!r}")
         try:
-            self.client.append(sent_folder, raw_message_bytes, flags=[b'\\Seen'])
+            self.client.append(sent_folder, raw_message, flags=[b'\\Seen'])
         except Exception as e:
             logger.error(f"Failed to append message to Sent folder '{sent_folder}': {str(e)}")
             raise RuntimeError("Failed to save message to Sent folder.")

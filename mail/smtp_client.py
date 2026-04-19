@@ -168,9 +168,9 @@ class SMTPEmailClient:
                     self._attach_file(msg, filepath)
             
             # Send
-            raw_bytes = msg.as_bytes()
-            self.client.sendmail(self.username, all_recipients, raw_bytes)
-            return raw_bytes
+            raw_message = msg.as_string()
+            self.client.sendmail(self.username, all_recipients, raw_message.encode())
+            return raw_message
         
         except FileNotFoundError as e:
             logger.error(f"Attachment file not found: {str(e)}")
