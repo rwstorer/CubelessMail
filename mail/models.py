@@ -12,6 +12,11 @@ class EmailAccount(models.Model):
     # Encrypted credential storage.
     imap_password_encrypted = models.TextField(blank=True, default='')
     
+    smtp_host = models.CharField(max_length=255, blank=True)
+    smtp_port = models.IntegerField(default=587, blank=True)
+    smtp_username = models.CharField(max_length=255, blank=True)
+    smtp_password_encrypted = models.TextField(blank=True, default='')
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -39,6 +44,24 @@ class EmailAccount(models.Model):
             self.imap_password_encrypted = encrypt_value(plaintext)
         else:
             self.imap_password_encrypted = ''
+    
+    @property
+    def smtp_password_decrypted(self):
+        """
+        Get the SMTP password, decrypted.
+        """
+        if self.smtp_password_encrypted:
+            return decrypt_value(self.smtp_password_encrypted)
+        return ''
+    
+    def set_smtp_password(self, plaintext):
+        """
+        Set the SMTP password (encrypted).
+        """
+        if plaintext:
+            self.smtp_password_encrypted = encrypt_value(plaintext)
+        else:
+            self.smtp_password_encrypted = ''
 
 
 class Folder(models.Model):
