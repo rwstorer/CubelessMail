@@ -197,7 +197,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     event.preventDefault();
 
-    const formData = new FormData(form);
     const submitButton = form.querySelector('button[type="submit"]');
     const errorsBox = form.querySelector('.compose-errors');
     const composeFragmentUrl = form.dataset.composeFragmentUrl || '/compose/fragment/';
@@ -211,9 +210,15 @@ document.addEventListener('DOMContentLoaded', function () {
       submitButton.disabled = true;
     }
 
+    if (window.CubelessCompose && typeof window.CubelessCompose.syncForm === 'function') {
+      window.CubelessCompose.syncForm(form);
+    }
+
+    const syncedFormData = new FormData(form);
+
     fetch(form.action, {
       method: 'POST',
-      body: formData,
+      body: syncedFormData,
       headers: {
         'X-Requested-With': 'XMLHttpRequest'
       }
@@ -433,6 +438,9 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .then(function (html) {
         detailPane.innerHTML = html;
+        if (window.CubelessCompose && typeof window.CubelessCompose.initWithin === 'function') {
+          window.CubelessCompose.initWithin(detailPane);
+        }
         activeController = null;
         // Opening a message marks it read server-side; mirror that immediately in the row indicator.
         removeUnreadDot(getActiveRow());
