@@ -72,7 +72,28 @@ class SMTPEmailClient:
                 pass
             self.client = None
 
-    def send_email(self, to_address, subject, body, html_body=None, attachments=None):
+    def __enter__(self):
+        """Context manager entry for SMTP lifecycle management."""
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit that always tears down SMTP connection."""
+        self.disconnect()
+
+    def send_email(
+        self,
+        to_address,
+        subject,
+        body,
+        html_body=None,
+        attachments=None,
+        cc_addresses=None,
+        bcc_addresses=None,
+        reply_to=None,
+        in_reply_to=None,
+        references=None,
+    ):
         """
         Send an email.
         
@@ -82,6 +103,11 @@ class SMTPEmailClient:
             body: Plain text body
             html_body: Optional HTML body (if provided, multipart alternative will be used)
             attachments: Optional list of file paths to attach
+            cc_addresses: Optional CC recipient string or list
+            bcc_addresses: Optional BCC recipient string or list
+            reply_to: Optional Reply-To header value
+            in_reply_to: Optional In-Reply-To header value
+            references: Optional References header value
         
         Returns:
             True if sent successfully
@@ -92,9 +118,16 @@ class SMTPEmailClient:
         if not self.client:
             raise RuntimeError("Not connected. Call connect() first.")
         
-        # Normalize to_address to list
+        # Normalize recipients to lists
         if isinstance(to_address, str):
             to_address = [to_address]
+        cc_addresses = cc_addresses or []
+        bcc_addresses = bcc_addresses or []
+        if isinstance(cc_addresses, str):
+            cc_addresses = [cc_addresses]
+        if isinstance(bcc_addresses, str):
+            bcc_addresses = [bcc_addresses]
+        all_recipients = list(to_address) + list(cc_addresses) + list(bcc_addresses)
         
         try:
             # Create message
@@ -105,6 +138,14 @@ class SMTPEmailClient:
             
             msg['From'] = self.username
             msg['To'] = ', '.join(to_address)
+            if cc_addresses:
+                msg['Cc'] = ', '.join(cc_addresses)
+            if reply_to:
+                msg['Reply-To'] = reply_to
+            if in_reply_to:
+                msg['In-Reply-To'] = in_reply_to
+            if references:
+                msg['References'] = references
             msg['Subject'] = subject
             
             # Attach bodies
@@ -125,7 +166,7 @@ class SMTPEmailClient:
                     self._attach_file(msg, filepath)
             
             # Send
-            self.client.sendmail(self.username, to_address, msg.as_string())
+            self.client.sendmail(self.username, all_recipients, msg.as_string())
             return True
         
         except FileNotFoundError as e:

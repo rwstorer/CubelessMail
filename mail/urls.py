@@ -16,5 +16,6 @@ urlpatterns = [
     path('message/<int:uid>/move/', views.message_move, name='message_move'),
     path('message/<int:uid>/mark-unread/', views.message_mark_unread, name='message_mark_unread'),
     path('message/<int:uid>/flag/', views.message_flag, name='message_flag'),
+    path('api/messages/send/', views.send_message_api, name='send_message_api'),
     path('api/check-new-messages/', views.check_new_messages, name='check_new_messages'),
 ]

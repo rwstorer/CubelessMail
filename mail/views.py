@@ -1,4 +1,9 @@
-from django.http import Http404, HttpResponse
+import json
+import os
+import tempfile
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.http import Http404, HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -7,8 +12,10 @@ from django.contrib.auth.decorators import login_required
 from urllib.parse import quote
 from datetime import timedelta
 import logging
+import nh3
 from .models import EmailAccount, Folder, CachedMessage
 from .imap_client import IMAPEmailClient
+from .smtp_client import SMTPEmailClient
 
 
 logger = logging.getLogger(__name__)
@@ -20,6 +27,196 @@ SPECIAL_FOLDERS = {
 
 READ_FILTERS = {'all', 'unread', 'read'}
 SORT_OPTIONS = {'date_desc', 'date_asc', 'from_asc', 'from_desc'}
+MAX_RECIPIENTS = 50
+MAX_SUBJECT_LEN = 255
+MAX_BODY_LEN = 200_000
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
+MAX_TOTAL_ATTACHMENT_SIZE = 25 * 1024 * 1024
+
+
+def _parse_recipient_values(raw_value):
+    """Parse recipient values from JSON arrays or comma-separated strings."""
+    if raw_value is None:
+        return []
+
+    values = []
+    if isinstance(raw_value, list):
+        for item in raw_value:
+            if item is None:
+                continue
+            values.extend(str(item).replace(';', ',').replace('\n', ',').split(','))
+    else:
+        values = str(raw_value).replace(';', ',').replace('\n', ',').split(',')
+
+    return [v.strip() for v in values if v and v.strip()]
+
+
+def _validate_recipients(to_values, cc_values, bcc_values):
+    """Validate recipient lists and return de-duplicated all-recipient list."""
+    errors = {}
+
+    if not to_values:
+        errors['to'] = ['At least one recipient is required.']
+
+    combined = to_values + cc_values + bcc_values
+    if len(combined) > MAX_RECIPIENTS:
+        errors['recipients'] = [f'No more than {MAX_RECIPIENTS} recipients are allowed.']
+
+    invalid = []
+    for address in combined:
+        try:
+            validate_email(address)
+        except ValidationError:
+            invalid.append(address)
+
+    if invalid:
+        errors['recipients'] = ['One or more email addresses are invalid.']
+
+    deduped = []
+    seen = set()
+    for address in combined:
+        lowered = address.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        deduped.append(address)
+
+    return errors, deduped
+
+
+def _sanitize_outgoing_html(html_body):
+    """Sanitize outgoing compose HTML to reduce script/tracking abuse."""
+    if not html_body:
+        return ''
+
+    allowed_tags = {
+        'a', 'abbr', 'b', 'blockquote', 'br', 'code', 'div', 'em', 'h1', 'h2',
+        'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'li', 'ol', 'p', 'pre', 'span',
+        'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul'
+    }
+    allowed_attributes = {
+        'a': {'href', 'title'},
+        'img': {'src', 'alt', 'title', 'width', 'height', 'style'},
+        'td': {'colspan', 'rowspan'},
+        'th': {'colspan', 'rowspan'},
+    }
+
+    return nh3.clean(
+        html_body,
+        tags=allowed_tags,
+        attributes=allowed_attributes,
+        url_schemes={'http', 'https', 'mailto'},
+    )
+
+
+def _parse_send_payload(request):
+    """Parse and validate send payload from JSON or form data."""
+    is_json = request.content_type and 'application/json' in request.content_type
+
+    if is_json:
+        try:
+            payload = json.loads(request.body.decode('utf-8') or '{}')
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None, {'payload': ['Malformed JSON payload.']}
+
+        to_values = _parse_recipient_values(payload.get('to'))
+        cc_values = _parse_recipient_values(payload.get('cc'))
+        bcc_values = _parse_recipient_values(payload.get('bcc'))
+        subject = str(payload.get('subject') or '').strip()
+        text_body = str(payload.get('text_body') or '').strip()
+        html_body = str(payload.get('html_body') or '').strip()
+        reply_to = str(payload.get('reply_to') or '').strip()
+        in_reply_to = str(payload.get('in_reply_to') or '').strip()
+        references = payload.get('references') or []
+    else:
+        to_values = _parse_recipient_values(request.POST.getlist('to') or request.POST.get('to'))
+        cc_values = _parse_recipient_values(request.POST.getlist('cc') or request.POST.get('cc'))
+        bcc_values = _parse_recipient_values(request.POST.getlist('bcc') or request.POST.get('bcc'))
+        subject = (request.POST.get('subject') or '').strip()
+        text_body = (request.POST.get('text_body') or '').strip()
+        html_body = (request.POST.get('html_body') or '').strip()
+        reply_to = (request.POST.get('reply_to') or '').strip()
+        in_reply_to = (request.POST.get('in_reply_to') or '').strip()
+        references = _parse_recipient_values(request.POST.get('references'))
+
+    errors, all_recipients = _validate_recipients(to_values, cc_values, bcc_values)
+
+    if len(subject) > MAX_SUBJECT_LEN:
+        errors['subject'] = [f'Subject must be {MAX_SUBJECT_LEN} characters or fewer.']
+
+    if len(text_body) > MAX_BODY_LEN:
+        errors['text_body'] = [f'Plain text body must be {MAX_BODY_LEN} characters or fewer.']
+
+    if len(html_body) > MAX_BODY_LEN:
+        errors['html_body'] = [f'HTML body must be {MAX_BODY_LEN} characters or fewer.']
+
+    if not text_body and not html_body:
+        errors['body'] = ['Either text_body or html_body is required.']
+
+    if reply_to:
+        try:
+            validate_email(reply_to)
+        except ValidationError:
+            errors['reply_to'] = ['reply_to must be a valid email address.']
+
+    attachments = request.FILES.getlist('attachments')
+    total_bytes = 0
+    for uploaded in attachments:
+        total_bytes += uploaded.size
+        if uploaded.size > MAX_ATTACHMENT_SIZE:
+            errors['attachments'] = [
+                f'Each attachment must be {MAX_ATTACHMENT_SIZE // (1024 * 1024)}MB or smaller.'
+            ]
+            break
+    if total_bytes > MAX_TOTAL_ATTACHMENT_SIZE:
+        errors['attachments_total'] = [
+            f'Total attachment size must be {MAX_TOTAL_ATTACHMENT_SIZE // (1024 * 1024)}MB or smaller.'
+        ]
+
+    if errors:
+        return None, errors
+
+    sanitized_html = _sanitize_outgoing_html(html_body)
+    references_header = ''
+    if isinstance(references, list):
+        references_header = ' '.join([str(v).strip() for v in references if str(v).strip()])
+    elif references:
+        references_header = str(references).strip()
+
+    return {
+        'to': to_values,
+        'cc': cc_values,
+        'bcc': bcc_values,
+        'all_recipients': all_recipients,
+        'subject': subject,
+        'text_body': text_body,
+        'html_body': sanitized_html,
+        'reply_to': reply_to,
+        'in_reply_to': in_reply_to,
+        'references': references_header,
+        'attachments': attachments,
+    }, None
+
+
+def _persist_uploaded_attachments(attachments):
+    """Persist uploaded files to temporary paths consumable by SMTP client."""
+    file_paths = []
+    for uploaded in attachments:
+        suffix = os.path.splitext(uploaded.name or '')[1]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            for chunk in uploaded.chunks():
+                temp_file.write(chunk)
+            file_paths.append(temp_file.name)
+    return file_paths
+
+
+def _cleanup_temp_files(file_paths):
+    """Delete any temporary files created for outbound attachments."""
+    for path in file_paths:
+        try:
+            os.remove(path)
+        except OSError:
+            logger.warning('Failed to remove temporary attachment path: %s', path)
 
 
 def _is_special_folder(name):
@@ -489,10 +686,6 @@ def message_detail_fragment(request, uid):
         'folders_with_counts': folders_with_counts,
     })
 
-
-from django.http import JsonResponse
-
-
 VIRTUAL_STARRED = '__starred__'
 
 
@@ -816,6 +1009,95 @@ def check_new_messages(request):
     except Exception:
         logger.exception('Failed to check new messages for folder: %s', folder_name)
         return JsonResponse({'error': 'Unable to check for new messages right now.'}, status=500)
+
+
+@login_required
+@require_POST
+def send_message_api(request):
+    """Send an outbound email through configured SMTP account settings."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return JsonResponse(
+            {'ok': False, 'errors': {'account': ['No email account configured.']}},
+            status=400,
+        )
+
+    missing_config = []
+    if not account.smtp_host:
+        missing_config.append('smtp_host')
+    if not account.smtp_username:
+        missing_config.append('smtp_username')
+    if not account.smtp_password_encrypted:
+        missing_config.append('smtp_password_encrypted')
+
+    if missing_config:
+        return JsonResponse(
+            {
+                'ok': False,
+                'errors': {
+                    'smtp': ['SMTP account settings are incomplete. Configure SMTP before sending.']
+                },
+            },
+            status=422,
+        )
+
+    payload, errors = _parse_send_payload(request)
+    if errors:
+        return JsonResponse({'ok': False, 'errors': errors}, status=400)
+    if payload is None:
+        return JsonResponse({'ok': False, 'errors': {'payload': ['Invalid send payload.']}}, status=400)
+
+    temp_paths = []
+    try:
+        temp_paths = _persist_uploaded_attachments(payload['attachments'])
+
+        smtp_port = int(account.smtp_port or 587)
+        use_tls = smtp_port != 465
+        client = SMTPEmailClient(
+            account.smtp_host,
+            account.smtp_username,
+            account.smtp_password_decrypted,
+            port=smtp_port,
+            use_tls=use_tls,
+        )
+        client.connect()
+        try:
+            client.send_email(
+                to_address=payload['to'],
+                cc_addresses=payload['cc'],
+                bcc_addresses=payload['bcc'],
+                subject=payload['subject'],
+                body=payload['text_body'],
+                html_body=payload['html_body'],
+                attachments=temp_paths,
+                reply_to=payload['reply_to'],
+                in_reply_to=payload['in_reply_to'],
+                references=payload['references'],
+            )
+        finally:
+            client.disconnect()
+    except ConnectionError:
+        logger.exception('SMTP connection failure while sending message.')
+        return JsonResponse(
+            {'ok': False, 'errors': {'smtp': ['Unable to connect to SMTP server right now.']}},
+            status=502,
+        )
+    except RuntimeError:
+        logger.exception('SMTP send failure.')
+        return JsonResponse(
+            {'ok': False, 'errors': {'send': ['Unable to send email right now. Please try again.']}},
+            status=502,
+        )
+    except Exception:
+        logger.exception('Unexpected send_message_api failure.')
+        return JsonResponse(
+            {'ok': False, 'errors': {'send': ['Unexpected error while sending email.']}},
+            status=500,
+        )
+    finally:
+        _cleanup_temp_files(temp_paths)
+
+    return JsonResponse({'ok': True, 'message': 'Email sent successfully.'}, status=200)
 
 
 @login_required
