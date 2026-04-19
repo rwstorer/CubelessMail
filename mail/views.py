@@ -1240,6 +1240,7 @@ def send_message_api(request):
     if payload is None:
         return JsonResponse({'ok': False, 'errors': {'payload': ['Invalid send payload.']}}, status=400)
 
+    raw_sent_bytes = None
     temp_paths = []
     try:
         temp_paths = _persist_uploaded_attachments(payload['attachments'])
@@ -1255,7 +1256,7 @@ def send_message_api(request):
         )
         client.connect()
         try:
-            client.send_email(
+            raw_sent_bytes = client.send_email(
                 to_address=payload['to'],
                 cc_addresses=payload['cc'],
                 bcc_addresses=payload['bcc'],
@@ -1289,6 +1290,20 @@ def send_message_api(request):
         )
     finally:
         _cleanup_temp_files(temp_paths)
+
+    # Best-effort: append a copy to the IMAP Sent folder.
+    # Failures here are non-fatal - the message was already delivered.
+    if raw_sent_bytes:
+        try:
+            with IMAPEmailClient(
+                account.imap_host,
+                account.imap_username,
+                account.imap_password_decrypted,
+                port=account.imap_port,
+            ) as imap:
+                imap.append_to_sent(raw_sent_bytes)
+        except Exception:
+            logger.warning('Failed to save sent message to Sent folder.', exc_info=True)
 
     return JsonResponse({'ok': True, 'message': 'Email sent successfully.'}, status=200)
 
