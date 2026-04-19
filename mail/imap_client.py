@@ -168,11 +168,13 @@ class IMAPEmailClient:
                 logger.error(f"Failed to create Sent folder: {str(e)}")
                 raise RuntimeError("Could not find or create a Sent folder.")
 
+        logger.info(f"Appending sent message to IMAP folder: {sent_folder!r}")
         try:
             self.client.append(sent_folder, raw_message_bytes, flags=[b'\\Seen'])
         except Exception as e:
             logger.error(f"Failed to append message to Sent folder '{sent_folder}': {str(e)}")
             raise RuntimeError("Failed to save message to Sent folder.")
+        return sent_folder
 
     def set_flag(self, uid, folder, flag, add=True):
         """Add or remove an IMAP flag on a message."""
