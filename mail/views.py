@@ -1012,6 +1012,37 @@ def check_new_messages(request):
 
 
 @login_required
+@require_GET
+def compose_fragment(request):
+    """Render compose form fragment for split-pane usage."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return render(request, 'mail/partials/compose_fragment.html', {
+            'compose_error': 'No email account configured. Please add one in the admin.',
+            'account': None,
+            'compose': {},
+        })
+
+    compose = {
+        'to': (request.GET.get('to') or '').strip(),
+        'cc': (request.GET.get('cc') or '').strip(),
+        'bcc': (request.GET.get('bcc') or '').strip(),
+        'subject': (request.GET.get('subject') or '').strip()[:MAX_SUBJECT_LEN],
+        'text_body': (request.GET.get('text_body') or '').strip()[:MAX_BODY_LEN],
+        'html_body': (request.GET.get('html_body') or '').strip()[:MAX_BODY_LEN],
+        'reply_to': (request.GET.get('reply_to') or '').strip(),
+        'in_reply_to': (request.GET.get('in_reply_to') or '').strip(),
+        'references': (request.GET.get('references') or '').strip(),
+    }
+
+    return render(request, 'mail/partials/compose_fragment.html', {
+        'account': account,
+        'compose': compose,
+        'compose_error': '',
+    })
+
+
+@login_required
 @require_POST
 def send_message_api(request):
     """Send an outbound email through configured SMTP account settings."""

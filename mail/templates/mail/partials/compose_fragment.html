@@ -1,0 +1,57 @@
+<div class="compose-fragment p-4">
+    <h2>Compose</h2>
+
+    {% if compose_error %}
+        <div class="detail-pane-status">
+            <p class="text-muted">{{ compose_error }}</p>
+        </div>
+    {% else %}
+        <p class="text-small text-muted">From: {{ account.email }}</p>
+
+        <form method="post" action="{% url 'send_message_api' %}" class="compose-form js-pane-action-form" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="composeTo">To</label>
+                <input id="composeTo" type="text" name="to" value="{{ compose.to }}" required class="w-100">
+            </div>
+
+            <div class="form-group">
+                <label for="composeCc">Cc</label>
+                <input id="composeCc" type="text" name="cc" value="{{ compose.cc }}" class="w-100">
+            </div>
+
+            <div class="form-group">
+                <label for="composeBcc">Bcc</label>
+                <input id="composeBcc" type="text" name="bcc" value="{{ compose.bcc }}" class="w-100">
+            </div>
+
+            <div class="form-group">
+                <label for="composeSubject">Subject</label>
+                <input id="composeSubject" type="text" name="subject" value="{{ compose.subject }}" maxlength="255" class="w-100">
+            </div>
+
+            <div class="form-group">
+                <label for="composeTextBody">Message</label>
+                <textarea id="composeTextBody" name="text_body" rows="10" class="w-100">{{ compose.text_body }}</textarea>
+            </div>
+
+            <div class="form-group" style="display:none;">
+                <input type="hidden" name="html_body" value="{{ compose.html_body }}">
+                <input type="hidden" name="reply_to" value="{{ compose.reply_to }}">
+                <input type="hidden" name="in_reply_to" value="{{ compose.in_reply_to }}">
+                <input type="hidden" name="references" value="{{ compose.references }}">
+            </div>
+
+            <div class="form-group">
+                <label for="composeAttachments">Attachments</label>
+                <input id="composeAttachments" type="file" name="attachments" multiple>
+                <p class="text-small text-muted">Up to 10MB per file, 25MB total.</p>
+            </div>
+
+            <div class="message-actions-toolbar" style="margin-top: 1rem;">
+                <button type="submit" class="btn btn-primary">Send</button>
+            </div>
+        </form>
+    {% endif %}
+</div>
