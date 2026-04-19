@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from urllib.parse import quote, urlencode
-from datetime import timedelta, datetime as dt_datetime, timezone as dt_timezone
+from datetime import timedelta
 import logging
 import nh3
 from .models import EmailAccount, Folder, CachedMessage
@@ -1326,10 +1326,11 @@ def send_message_api(request):
             # Invalidate the Sent folder's message cache so the next inbox
             # view re-fetches from IMAP and shows the newly appended message.
             if sent_folder_name:
-                from mail.models import Folder as MailFolder
-                MailFolder.objects.filter(
-                    account=account, name=sent_folder_name
-                ).update(last_updated=dt_datetime(2000, 1, 1, tzinfo=dt_timezone.utc))
+                try:
+                    sent_folder_obj = Folder.objects.get(account=account, name=sent_folder_name)
+                    CachedMessage.objects.filter(account=account, folder=sent_folder_obj).delete()
+                except Folder.DoesNotExist:
+                    pass
         except Exception:
             logger.warning('Failed to save sent message to Sent folder.', exc_info=True)
 
