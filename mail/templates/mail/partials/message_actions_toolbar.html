@@ -47,7 +47,7 @@
 
         {# Move to folder #}
         {% if folders_with_counts %}
-        <form method="post" action="{% url 'message_move' uid=message.uid %}" class="msg-action-move-form js-pane-action-form" data-pane-action="remove">
+        <form method="post" action="{% url 'message_move' uid=message.uid %}" class="msg-action-move-form js-pane-action-form" data-pane-action="remove" data-uid="{{ message.uid }}">
             {% csrf_token %}
             <input type="hidden" name="folder" value="{{ current_folder }}">
             <select name="to_folder" class="msg-action-select" aria-label="Move to folder">
@@ -68,7 +68,7 @@
     <div class="msg-action-group msg-action-group--right">
 
         {# Archive #}
-        <form method="post" action="{% url 'message_archive' uid=message.uid %}" class="js-pane-action-form" data-pane-action="remove">
+        <form method="post" action="{% url 'message_archive' uid=message.uid %}" class="js-pane-action-form" data-pane-action="remove" data-uid="{{ message.uid }}">
             {% csrf_token %}
             <input type="hidden" name="folder" value="{{ current_folder }}">
             <button type="submit" class="msg-action-btn" title="Archive">
@@ -77,7 +77,7 @@
         </form>
 
         {# Delete #}
-        <form method="post" action="{% url 'message_delete' uid=message.uid %}" class="js-pane-action-form" data-pane-action="remove">
+        <form method="post" action="{% url 'message_delete' uid=message.uid %}" class="js-pane-action-form" data-pane-action="remove" data-uid="{{ message.uid }}">
             {% csrf_token %}
             <input type="hidden" name="folder" value="{{ current_folder }}">
             <button type="submit" class="msg-action-btn msg-action-btn--destructive"

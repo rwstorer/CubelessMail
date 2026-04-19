@@ -349,8 +349,8 @@ document.addEventListener('DOMContentLoaded', function () {
     })
       .then(function (response) {
         if (actionMode === 'remove' && response.status === 204) {
-          const toolbarUid = detailPane.querySelector('.message-actions-toolbar')?.dataset.uid || null;
-          const uidToRemove = activeUid || toolbarUid;
+          const formUid = form.dataset.uid || null;
+          const uidToRemove = activeUid || formUid;
           const selected = uidToRemove
             ? listPane.querySelector('[data-uid="' + CSS.escape(String(uidToRemove)) + '"]')
             : null;
