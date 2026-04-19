@@ -7,11 +7,14 @@ from imapclient import IMAPClient
 from email.parser import BytesParser
 from email.policy import default
 from urllib.parse import quote, urlparse
+import logging
 import re
 
 from django.utils import timezone
 
 import nh3
+
+logger = logging.getLogger(__name__)
 
 
 class IMAPEmailClient:
@@ -48,7 +51,8 @@ class IMAPEmailClient:
             self.client.login(self.username, self.password)
             return True
         except Exception as e:
-            raise ConnectionError(f"Failed to connect to {self.host}: {str(e)}")
+            logger.error(f"IMAP connection failed to {self.host}:{self.port}: {str(e)}")
+            raise ConnectionError("Failed to connect to IMAP server. Check your host, port, and credentials.")
 
     def _normalize_envelope_date(self, date_value):
         """Return a timezone-aware datetime suitable for Django DateTimeField storage."""
@@ -81,7 +85,8 @@ class IMAPEmailClient:
             folders = self.client.list_folders()
             return [folder[2] for folder in folders]
         except Exception as e:
-            raise RuntimeError(f"Failed to list folders: {str(e)}")
+            logger.error(f"Failed to list folders: {str(e)}")
+            raise RuntimeError("Failed to list folders.")
 
     def create_folder(self, name):
         """Create a new folder on the IMAP server."""
@@ -90,7 +95,8 @@ class IMAPEmailClient:
         try:
             self.client.create_folder(name)
         except Exception as e:
-            raise RuntimeError(f"Failed to create folder '{name}': {str(e)}")
+            logger.error(f"Failed to create folder '{name}': {str(e)}")
+            raise RuntimeError("Failed to create folder.")
 
     def delete_folder(self, name):
         """Delete a folder from the IMAP server."""
@@ -99,7 +105,8 @@ class IMAPEmailClient:
         try:
             self.client.delete_folder(name)
         except Exception as e:
-            raise RuntimeError(f"Failed to delete folder '{name}': {str(e)}")
+            logger.error(f"Failed to delete folder '{name}': {str(e)}")
+            raise RuntimeError("Failed to delete folder.")
 
     def delete_message(self, uid, folder):
         """Move message to Trash, or expunge if already in Trash."""
@@ -227,7 +234,8 @@ class IMAPEmailClient:
             return messages
 
         except Exception as e:
-            raise RuntimeError(f"Search failed in '{folder}': {str(e)}")
+            logger.error(f"IMAP search failed: {str(e)}")
+            raise RuntimeError("Search failed.")
 
     def fetch_emails(self, folder='INBOX', limit=None):
         """
@@ -283,14 +291,14 @@ class IMAPEmailClient:
                     }
                     emails.append(email_dict)
                 except Exception as e:
-                    # Skip emails that fail to parse
-                    print(f"Warning: Failed to parse email {msg_id}: {str(e)}")
+                    logger.warning(f"Failed to parse email {msg_id}: {str(e)}")
                     continue
 
             return emails
 
         except Exception as e:
-            raise RuntimeError(f"Failed to fetch emails from {folder}: {str(e)}")
+            logger.error(f"Failed to fetch emails: {str(e)}")
+            raise RuntimeError("Failed to fetch emails.")
 
     def fetch_email_by_uid(self, uid, folder='INBOX', allow_remote_images=False):
         """
@@ -346,7 +354,8 @@ class IMAPEmailClient:
                 'raw': email_obj,
             }
         except Exception as e:
-            raise RuntimeError(f"Failed to fetch email UID {uid} from {folder}: {str(e)}")
+            logger.error(f"Failed to fetch email UID {uid}: {str(e)}")
+            raise RuntimeError("Failed to fetch email.")
 
     def _parse_email(self, raw_email):
         """
@@ -690,7 +699,8 @@ class IMAPEmailClient:
             
             return server_folders
         except Exception as e:
-            raise RuntimeError(f"Failed to sync folder cache: {str(e)}")
+            logger.error(f"Failed to sync folder cache: {str(e)}")
+            raise RuntimeError("Failed to sync folder cache.")
 
     def sync_messages_cache(self, account, folder_obj, CachedMessageModel, limit=100):
         """
@@ -761,7 +771,8 @@ class IMAPEmailClient:
             
             return cached_count
         except Exception as e:
-            raise RuntimeError(f"Failed to sync message cache: {str(e)}")
+            logger.error(f"Failed to sync message cache: {str(e)}")
+            raise RuntimeError("Failed to sync message cache.")
 
     def __enter__(self):
         """Context manager entry."""
