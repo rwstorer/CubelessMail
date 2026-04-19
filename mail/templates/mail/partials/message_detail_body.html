@@ -3,6 +3,9 @@
     <div class="p-4">
         <h2>{{ message.subject }}</h2>
         <p class="text-small text-muted">From: {{ message.sender }}</p>
+        {% if message.to %}<p class="text-small text-muted">To: {{ message.to }}</p>{% endif %}
+        {% if message.cc %}<p class="text-small text-muted">CC: {{ message.cc }}</p>{% endif %}
+        {% if message.bcc %}<p class="text-small text-muted">BCC: {{ message.bcc }}</p>{% endif %}
         <p class="text-small text-muted">Date: {{ message.date }}</p>
 
         {% if message.has_html and not load_remote_images and message.blocked_remote_images > 0 %}
