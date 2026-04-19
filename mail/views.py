@@ -219,6 +219,61 @@ def _cleanup_temp_files(file_paths):
             logger.warning('Failed to remove temporary attachment path: %s', path)
 
 
+def _build_compose_context(request, account):
+    """Build compose prefill context from query parameters."""
+    return {
+        'to': (request.GET.get('to') or '').strip(),
+        'cc': (request.GET.get('cc') or '').strip(),
+        'bcc': (request.GET.get('bcc') or '').strip(),
+        'subject': (request.GET.get('subject') or '').strip()[:MAX_SUBJECT_LEN],
+        'text_body': (request.GET.get('text_body') or '').strip()[:MAX_BODY_LEN],
+        'html_body': (request.GET.get('html_body') or '').strip()[:MAX_BODY_LEN],
+        'reply_to': (request.GET.get('reply_to') or '').strip(),
+        'in_reply_to': (request.GET.get('in_reply_to') or '').strip(),
+        'references': (request.GET.get('references') or '').strip(),
+    }
+
+
+def _get_sidebar_folder_rows(account):
+    """Return folder rows used by sidebar templates."""
+    cache_cutoff = timezone.now() - timedelta(minutes=10)
+    cached_folders = Folder.objects.filter(
+        account=account,
+        last_updated__gte=cache_cutoff,
+        is_active=True,
+    )
+
+    if cached_folders.exists():
+        folders = list(cached_folders.values_list('name', flat=True))
+    else:
+        folders = list(
+            Folder.objects.filter(account=account, is_active=True).values_list('name', flat=True)
+        )
+
+    folders = _prioritize_primary_inbox(folders)
+
+    unread_counts = {}
+    for folder_name in folders:
+        try:
+            folder_obj = Folder.objects.get(account=account, name=folder_name, is_active=True)
+            cached_messages = CachedMessage.objects.filter(account=account, folder=folder_obj)
+            unread_count = sum(1 for msg in cached_messages if '\\Seen' not in msg.flags)
+            unread_counts[folder_name] = unread_count
+        except Folder.DoesNotExist:
+            unread_counts[folder_name] = 0
+
+    folders_with_counts = [
+        {
+            'name': name,
+            'unread': unread_counts.get(name, 0),
+            'is_special': _is_special_folder(name),
+        }
+        for name in folders
+    ]
+
+    return folders_with_counts, unread_counts
+
+
 def _is_special_folder(name):
     normalized = name.strip().lower()
     if normalized in SPECIAL_FOLDERS:
@@ -1021,24 +1076,39 @@ def compose_fragment(request):
             'compose_error': 'No email account configured. Please add one in the admin.',
             'account': None,
             'compose': {},
+            'mobile_fallback': False,
         })
 
-    compose = {
-        'to': (request.GET.get('to') or '').strip(),
-        'cc': (request.GET.get('cc') or '').strip(),
-        'bcc': (request.GET.get('bcc') or '').strip(),
-        'subject': (request.GET.get('subject') or '').strip()[:MAX_SUBJECT_LEN],
-        'text_body': (request.GET.get('text_body') or '').strip()[:MAX_BODY_LEN],
-        'html_body': (request.GET.get('html_body') or '').strip()[:MAX_BODY_LEN],
-        'reply_to': (request.GET.get('reply_to') or '').strip(),
-        'in_reply_to': (request.GET.get('in_reply_to') or '').strip(),
-        'references': (request.GET.get('references') or '').strip(),
-    }
+    compose = _build_compose_context(request, account)
 
     return render(request, 'mail/partials/compose_fragment.html', {
         'account': account,
         'compose': compose,
         'compose_error': '',
+        'mobile_fallback': False,
+    })
+
+
+@login_required
+@require_GET
+def compose_page(request):
+    """Render full compose page (mobile fallback and direct navigation)."""
+    account = EmailAccount.objects.first()
+    if not account:
+        return render(request, 'mail/no_account.html', {
+            'message': 'No email account configured. Please add one in the admin.'
+        })
+
+    folders_with_counts, unread_counts = _get_sidebar_folder_rows(account)
+
+    return render(request, 'mail/compose.html', {
+        'account': account,
+        'current_folder': 'INBOX',
+        'folders_with_counts': folders_with_counts,
+        'unread_counts': unread_counts,
+        'compose': _build_compose_context(request, account),
+        'compose_error': '',
+        'mobile_fallback': True,
     })
 
 

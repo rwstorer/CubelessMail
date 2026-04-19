@@ -64,6 +64,13 @@ document.addEventListener('DOMContentLoaded', function () {
   let activeUid = null;
   let activeController = null;
 
+  function clearSelection() {
+    activeUid = null;
+    listPane.querySelectorAll('.message-item').forEach(function (el) {
+      el.classList.remove('selected');
+    });
+  }
+
   function getActiveRow() {
     if (!activeUid) {
       return null;
@@ -159,6 +166,118 @@ document.addEventListener('DOMContentLoaded', function () {
     event.preventDefault();
     loadFragment(link.dataset.fragmentUrl);
   });
+
+  // Intercept compose trigger links on desktop and load into the detail pane.
+  document.addEventListener('click', function (event) {
+    const composeTrigger = event.target.closest('[data-compose-fragment-url]');
+    if (!composeTrigger) {
+      return;
+    }
+
+    if (window.innerWidth < MOBILE_BREAKPOINT) {
+      // Allow normal navigation to full compose page on mobile.
+      return;
+    }
+
+    event.preventDefault();
+    clearSelection();
+    loadFragment(composeTrigger.dataset.composeFragmentUrl);
+  });
+
+  // Keep compose form submission in the detail pane on desktop/tablet.
+  detailPane.addEventListener('submit', function (event) {
+    if (window.innerWidth < MOBILE_BREAKPOINT) {
+      return;
+    }
+
+    const form = event.target.closest('form.js-compose-form');
+    if (!form) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const formData = new FormData(form);
+    const submitButton = form.querySelector('button[type="submit"]');
+    const errorsBox = form.querySelector('.compose-errors');
+    const composeFragmentUrl = form.dataset.composeFragmentUrl || '/compose/fragment/';
+
+    if (errorsBox) {
+      errorsBox.style.display = 'none';
+      errorsBox.innerHTML = '';
+    }
+
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return {
+            ok: response.ok,
+            status: response.status,
+            data: data
+          };
+        }).catch(function () {
+          return {
+            ok: false,
+            status: response.status,
+            data: { ok: false, errors: { send: ['Unexpected server response.'] } }
+          };
+        });
+      })
+      .then(function (result) {
+        if (result.ok && result.data && result.data.ok) {
+          detailPane.innerHTML = '<div class="detail-pane-status"><p class="text-muted">Email sent successfully.</p><p><a href="#" data-compose-fragment-url="' + composeFragmentUrl + '">Compose another message</a></p></div>';
+          return;
+        }
+
+        const errors = (result.data && result.data.errors) || { send: ['Unable to send email.'] };
+        const messages = [];
+
+        Object.keys(errors).forEach(function (key) {
+          const value = errors[key];
+          if (Array.isArray(value)) {
+            value.forEach(function (entry) {
+              messages.push(String(entry));
+            });
+          } else if (value) {
+            messages.push(String(value));
+          }
+        });
+
+        if (!messages.length) {
+          messages.push('Unable to send email.');
+        }
+
+        if (errorsBox) {
+          errorsBox.style.display = 'block';
+          errorsBox.style.marginBottom = '1rem';
+          errorsBox.style.padding = '0.75rem';
+          errorsBox.style.border = '1px solid var(--border-color)';
+          errorsBox.style.borderRadius = '8px';
+          errorsBox.style.background = 'var(--hover-bg)';
+          errorsBox.innerHTML = messages.map(function (msg) {
+            return '<p class="text-small text-muted" style="margin: 0 0 0.35rem 0;">' + msg + '</p>';
+          }).join('');
+        }
+      })
+      .catch(function () {
+        showError();
+      })
+      .finally(function () {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+      });
+  }, true);
 
   // Keep message actions inside the detail pane on desktop/tablet.
   detailPane.addEventListener('submit', function (event) {
@@ -293,9 +412,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }, true);
 
   function selectItem(item) {
-    listPane.querySelectorAll('.message-item').forEach(function (el) {
-      el.classList.remove('selected');
-    });
+    clearSelection();
     item.classList.add('selected');
   }
 

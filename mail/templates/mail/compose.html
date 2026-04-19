@@ -1,0 +1,11 @@
+{% extends 'mail/base.html' %}
+
+{% block title %}Compose - CubelessMail{% endblock %}
+
+{% block sidebar %}
+{% include 'mail/partials/sidebar_folders.html' %}
+{% endblock %}
+
+{% block content %}
+{% include 'mail/partials/compose_fragment.html' %}
+{% endblock %}
