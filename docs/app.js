@@ -77,6 +77,89 @@ const messages = [
     }
 ];
 
+const appState = {
+    selectedMessageId: null,
+    activeFolder: 'inbox',
+    composeQuill: null
+};
+
+function normalizeHtml(html) {
+    if (!html) {
+        return '';
+    }
+    const trimmed = String(html).trim();
+    if (trimmed === '<p><br></p>') {
+        return '';
+    }
+    return trimmed;
+}
+
+function syncComposeBody() {
+    const plainInput = document.getElementById('composeBody');
+    const htmlInput = document.getElementById('composeBodyHtml');
+
+    if (!plainInput || !htmlInput) {
+        return;
+    }
+
+    if (!appState.composeQuill) {
+        htmlInput.value = '';
+        return;
+    }
+
+    const html = normalizeHtml(appState.composeQuill.root.innerHTML);
+    const text = appState.composeQuill.getText().replace(/\s+$/g, '');
+
+    plainInput.value = text;
+    htmlInput.value = html;
+}
+
+function initComposeEditor() {
+    appState.composeQuill = null;
+
+    const editorHost = document.getElementById('composeEditor');
+    const plainInput = document.getElementById('composeBody');
+    const htmlInput = document.getElementById('composeBodyHtml');
+
+    if (!editorHost || !plainInput || !htmlInput) {
+        return;
+    }
+
+    if (typeof window.Quill !== 'function') {
+        return;
+    }
+
+    editorHost.style.display = 'block';
+
+    const quill = new window.Quill(editorHost, {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                [{ header: [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ list: 'ordered' }, { list: 'bullet' }],
+                [{ indent: '-1' }, { indent: '+1' }],
+                ['link', 'blockquote', 'code-block'],
+                ['clean']
+            ]
+        },
+        placeholder: 'Write your message...'
+    });
+
+    if (plainInput.value) {
+        quill.setText(plainInput.value);
+    }
+
+    plainInput.style.display = 'none';
+    appState.composeQuill = quill;
+
+    quill.on('text-change', function () {
+        syncComposeBody();
+    });
+
+    syncComposeBody();
+}
+
 function parseDemoDate(value) {
     return new Date('2026 ' + value.replace(',', ''));
 }
@@ -118,6 +201,97 @@ function getFilteredMessages() {
     }
 
     return result;
+}
+
+function setFolderActive(folder) {
+    appState.activeFolder = folder;
+    document.querySelectorAll('.folder-item').forEach((item) => {
+        item.classList.toggle('active', item.dataset.folder === folder);
+    });
+}
+
+function setComposeActive(active) {
+    const composeTrigger = document.getElementById('composeTrigger');
+    composeTrigger.classList.toggle('active', active);
+}
+
+function showInboxPane() {
+    const pane = document.querySelector('.message-list-pane');
+    pane.classList.remove('is-hidden');
+}
+
+function showFolderPlaceholder(folderName) {
+    const detail = document.getElementById('detailPane');
+    detail.innerHTML = `
+        <div class="detail-empty">
+            ${folderName} is shown in the full app. This docs demo highlights Inbox + Compose behavior.
+        </div>
+    `;
+}
+
+function renderComposePane() {
+    appState.composeQuill = null;
+    const detail = document.getElementById('detailPane');
+    detail.innerHTML = `
+        <div class="compose-fragment">
+            <h2>Compose</h2>
+            <p class="text-small text-muted">From: owner@company.com</p>
+
+            <form id="demoComposeForm" class="compose-form">
+                <div id="composeStatus" class="compose-status success" style="display:none;" role="status" aria-live="polite"></div>
+
+                <div class="form-group">
+                    <label for="composeTo">To</label>
+                    <input id="composeTo" class="compose-input" type="text" required placeholder="someone@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="composeCc">Cc</label>
+                    <input id="composeCc" class="compose-input" type="text" placeholder="">
+                </div>
+
+                <div class="form-group">
+                    <label for="composeBcc">Bcc</label>
+                    <input id="composeBcc" class="compose-input" type="text" placeholder="">
+                </div>
+
+                <div class="form-group">
+                    <label for="composeSubject">Subject</label>
+                    <input id="composeSubject" class="compose-input" type="text" maxlength="255" placeholder="Subject">
+                </div>
+
+                <div class="form-group">
+                    <label for="composeBody">Message</label>
+                    <div id="composeEditor" class="compose-rich-editor" style="display:none;"></div>
+                    <textarea id="composeBody" class="compose-textarea" rows="10" placeholder="Write your message..." required></textarea>
+                    <input id="composeBodyHtml" type="hidden" value="">
+                    <p class="text-small text-muted">Rich formatting is enabled when the editor loads. Fallback is plain text.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="composeAttachments">Attachments</label>
+                    <input id="composeAttachments" class="compose-file-input" type="file" multiple>
+                    <p class="text-small text-muted">Demo only. Files are not uploaded from this page.</p>
+                </div>
+
+                <div class="message-actions-toolbar" style="margin-top: 1rem; padding-left: 0;">
+                    <button type="submit" class="msg-action-btn msg-action-btn--active">Send</button>
+                    <button type="button" id="composeCancel" class="msg-action-btn">Cancel</button>
+                </div>
+            </form>
+        </div>
+    `;
+}
+
+function openComposeView() {
+    setComposeActive(true);
+    setFolderActive('inbox');
+    showInboxPane();
+    document.querySelectorAll('.message-item').forEach((el) => {
+        el.classList.remove('selected');
+    });
+    renderComposePane();
+    initComposeEditor();
 }
 
 // Render message list
@@ -192,11 +366,21 @@ function clearSearchQuery() {
 function selectMessage(id, element) {
     const msg = messages.find(m => m.id === id);
     if (!msg) return;
+    appState.selectedMessageId = id;
+    setComposeActive(false);
+    setFolderActive('inbox');
+    showInboxPane();
 
     const detail = document.getElementById('detailPane');
     detail.innerHTML = `
         <div class="message-actions-toolbar">
             <div class="msg-action-group">
+                <form>
+                    <button type="button" class="msg-action-btn" title="Reply">Reply</button>
+                </form>
+                <form>
+                    <button type="button" class="msg-action-btn" title="Forward">Forward</button>
+                </form>
                 <form>
                     <button type="button" class="msg-action-btn" title="Mark as unread">Mark unread</button>
                 </form>
@@ -239,6 +423,71 @@ function selectMessage(id, element) {
         element.classList.add('selected');
     }
 }
+
+document.getElementById('composeTrigger').addEventListener('click', function () {
+    openComposeView();
+});
+
+document.querySelectorAll('.folder-item').forEach((item) => {
+    item.addEventListener('click', function () {
+        const folder = item.dataset.folder;
+        setComposeActive(false);
+        setFolderActive(folder);
+
+        if (folder === 'inbox') {
+            showInboxPane();
+            if (appState.selectedMessageId) {
+                const selectedEl = Array.from(document.querySelectorAll('.message-item')).find((el) => {
+                    return el.getAttribute('onclick') === `selectMessage(${appState.selectedMessageId}, this)`;
+                });
+                selectMessage(appState.selectedMessageId, selectedEl || null);
+            } else {
+                document.getElementById('detailPane').innerHTML = '<div class="detail-empty">Select a message to read it</div>';
+            }
+            return;
+        }
+
+        showFolderPlaceholder(item.textContent.trim());
+    });
+});
+
+document.getElementById('detailPane').addEventListener('submit', function (event) {
+    if (event.target.id !== 'demoComposeForm') {
+        return;
+    }
+
+    event.preventDefault();
+    syncComposeBody();
+
+    const to = document.getElementById('composeTo').value.trim();
+    const body = document.getElementById('composeBody').value.trim();
+    if (!to || !body) {
+        return;
+    }
+
+    const status = document.getElementById('composeStatus');
+    status.style.display = 'block';
+    status.textContent = 'Demo mode: message queued for sending in the production app.';
+});
+
+document.getElementById('detailPane').addEventListener('click', function (event) {
+    if (event.target.id !== 'composeCancel') {
+        return;
+    }
+
+    setComposeActive(false);
+    setFolderActive('inbox');
+    showInboxPane();
+
+    if (appState.selectedMessageId) {
+        const selectedEl = Array.from(document.querySelectorAll('.message-item')).find((el) => {
+            return el.getAttribute('onclick') === `selectMessage(${appState.selectedMessageId}, this)`;
+        });
+        selectMessage(appState.selectedMessageId, selectedEl || null);
+    } else {
+        document.getElementById('detailPane').innerHTML = '<div class="detail-empty">Select a message to read it</div>';
+    }
+});
 
 // Initial render
 renderMessageList();

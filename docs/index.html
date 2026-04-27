@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CubelessMail - A Lightweight Web-Based Email Client</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,6 +15,7 @@
                 <h1>CubelessMail</h1>
             </div>
             <div class="app-header-controls">
+                <a href="https://github.com/rwstorer/CubelessMail" target="_blank" rel="noopener noreferrer" class="btn-secondary app-header-link">GitHub</a>
                 <button type="button" id="themeToggle" class="btn-secondary" title="Toggle dark mode">🌙</button>
             </div>
         </div>
@@ -24,27 +26,31 @@
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="sidebar-section">
+                <button type="button" id="composeTrigger" class="compose-trigger">+ Compose</button>
+            </div>
+            <div class="sidebar-section">
                 <div class="sidebar-section-title">Folders</div>
-                <div class="folder-item active">
+                <div class="folder-item active" data-folder="inbox">
                     <span>📥 Inbox</span>
                     <span class="folder-badge">5</span>
                 </div>
-                <div class="folder-item">
+                <div class="folder-item" data-folder="starred">
                     <span>⭐ Starred</span>
                 </div>
-                <div class="folder-item">
+                <div class="folder-item" data-folder="drafts">
                     <span>✏️ Drafts</span>
                     <span class="folder-badge">2</span>
                 </div>
-                <div class="folder-item">
+                <div class="folder-item" data-folder="sent">
                     <span>📤 Sent</span>
                 </div>
-                <div class="folder-item">
+                <div class="folder-item" data-folder="trash">
                     <span>🗑️ Trash</span>
                 </div>
-                <div class="folder-item">
+                <div class="folder-item" data-folder="archive">
                     <span>📦 Archive</span>
                 </div>
+                <button type="button" class="compose-trigger folder-create-demo">+ Folder</button>
             </div>
         </div>
 
@@ -96,6 +102,15 @@
         </div>
     </div>
 
+    <footer class="docs-footer" aria-label="Project links and license">
+        <p>
+            Demo of the CubelessMail web client.
+            Source: <a href="https://github.com/rwstorer/CubelessMail" target="_blank" rel="noopener noreferrer">rwstorer/CubelessMail</a>.
+            License: <a href="https://github.com/rwstorer/CubelessMail/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT</a>.
+        </p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
