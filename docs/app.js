@@ -222,11 +222,13 @@ function showInboxPane() {
 
 function showFolderPlaceholder(folderName) {
     const detail = document.getElementById('detailPane');
-    detail.innerHTML = `
-        <div class="detail-empty">
-            ${folderName} is shown in the full app. This docs demo highlights Inbox + Compose behavior.
-        </div>
-    `;
+    detail.replaceChildren();
+
+    const empty = document.createElement('div');
+    empty.className = 'detail-empty';
+    empty.textContent = `${folderName} is shown in the full app. This docs demo highlights Inbox + Compose behavior.`;
+
+    detail.appendChild(empty);
 }
 
 function renderComposePane() {
