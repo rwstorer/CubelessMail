@@ -615,3 +615,28 @@ article.content.split-pane {
   cursor: pointer;
   max-width: 130px;
 }
+
+/* Compose form inline header fields */
+.compose-inline-field {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.compose-inline-label {
+  margin: 0;
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .compose-inline-field {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .compose-inline-label {
+    margin-bottom: 0.2rem;
+  }
+}

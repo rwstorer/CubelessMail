@@ -12,23 +12,23 @@
             {% csrf_token %}
             <div class="compose-errors" style="display:none;"></div>
 
-            <div class="form-group">
-                <label for="composeTo">To</label>
+            <div class="form-group compose-inline-field">
+                <label for="composeTo" class="compose-inline-label">To</label>
                 <input id="composeTo" type="text" name="to" value="{{ compose.to }}" required class="w-100">
             </div>
 
-            <div class="form-group">
-                <label for="composeCc">Cc</label>
+            <div class="form-group compose-inline-field">
+                <label for="composeCc" class="compose-inline-label">Cc</label>
                 <input id="composeCc" type="text" name="cc" value="{{ compose.cc }}" class="w-100">
             </div>
 
-            <div class="form-group">
-                <label for="composeBcc">Bcc</label>
+            <div class="form-group compose-inline-field">
+                <label for="composeBcc" class="compose-inline-label">Bcc</label>
                 <input id="composeBcc" type="text" name="bcc" value="{{ compose.bcc }}" class="w-100">
             </div>
 
-            <div class="form-group">
-                <label for="composeSubject">Subject</label>
+            <div class="form-group compose-inline-field">
+                <label for="composeSubject" class="compose-inline-label">Subject</label>
                 <input id="composeSubject" type="text" name="subject" value="{{ compose.subject }}" maxlength="255" class="w-100">
             </div>
 
