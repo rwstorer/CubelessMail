@@ -640,3 +640,46 @@ article.content.split-pane {
     margin-bottom: 0.2rem;
   }
 }
+
+/* Dark mode Quill editor improvements */
+[data-theme="dark"] .compose-rich-editor.ql-container {
+  background: var(--surface-color);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .compose-rich-editor .ql-toolbar {
+  background: var(--hover-bg);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .compose-rich-editor .ql-stroke {
+  stroke: var(--text-color);
+}
+
+[data-theme="dark"] .compose-rich-editor .ql-fill,
+[data-theme="dark"] .compose-rich-editor .ql-picker-label {
+  fill: var(--text-color);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .compose-rich-editor .ql-picker-item:selected,
+[data-theme="dark"] .compose-rich-editor .ql-picker-item:hover,
+[data-theme="dark"] .compose-rich-editor .ql-picker-label:hover {
+  color: var(--accent-color);
+}
+
+[data-theme="dark"] .compose-rich-editor .ql-toolbar button:hover,
+[data-theme="dark"] .compose-rich-editor .ql-toolbar button.ql-active,
+[data-theme="dark"] .compose-rich-editor .ql-toolbar button:focus {
+  color: var(--accent-color);
+}
+
+[data-theme="dark"] .compose-rich-editor .ql-toolbar button:hover .ql-stroke,
+[data-theme="dark"] .compose-rich-editor .ql-toolbar button.ql-active .ql-stroke {
+  stroke: var(--accent-color);
+}
+
+[data-theme="dark"] .compose-rich-editor .ql-toolbar button:hover .ql-fill,
+[data-theme="dark"] .compose-rich-editor .ql-toolbar button.ql-active .ql-fill {
+  fill: var(--accent-color);
+}
