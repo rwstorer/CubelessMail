@@ -242,24 +242,24 @@ function renderComposePane() {
             <form id="demoComposeForm" class="compose-form">
                 <div id="composeStatus" class="compose-status success" style="display:none;" role="status" aria-live="polite"></div>
 
-                <div class="form-group">
-                    <label for="composeTo">To</label>
-                    <input id="composeTo" class="compose-input" type="text" required placeholder="someone@example.com">
+                <div class="form-group compose-inline-field">
+                    <label for="composeTo" class="compose-inline-label">To</label>
+                    <input id="composeTo" type="text" required placeholder="someone@example.com" style="width: 100%;">
                 </div>
 
-                <div class="form-group">
-                    <label for="composeCc">Cc</label>
-                    <input id="composeCc" class="compose-input" type="text" placeholder="">
+                <div class="form-group compose-inline-field">
+                    <label for="composeCc" class="compose-inline-label">Cc</label>
+                    <input id="composeCc" type="text" placeholder="" style="width: 100%;">
                 </div>
 
-                <div class="form-group">
-                    <label for="composeBcc">Bcc</label>
-                    <input id="composeBcc" class="compose-input" type="text" placeholder="">
+                <div class="form-group compose-inline-field">
+                    <label for="composeBcc" class="compose-inline-label">Bcc</label>
+                    <input id="composeBcc" type="text" placeholder="" style="width: 100%;">
                 </div>
 
-                <div class="form-group">
-                    <label for="composeSubject">Subject</label>
-                    <input id="composeSubject" class="compose-input" type="text" maxlength="255" placeholder="Subject">
+                <div class="form-group compose-inline-field">
+                    <label for="composeSubject" class="compose-inline-label">Subject</label>
+                    <input id="composeSubject" type="text" maxlength="255" placeholder="Subject" style="width: 100%;">
                 </div>
 
                 <div class="form-group">
